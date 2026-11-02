@@ -1,4 +1,4 @@
-# 系统垃圾文件
+# ===== 系统垃圾文件 =====
 Thumbs.db
 desktop.ini
 ~$*
@@ -6,3 +6,25 @@ desktop.ini
 *.crdownload
 __pycache__/
 *.pyc
+
+# ===== 敏感信息（令牌/密钥/凭据，一律不上传）=====
+.env
+.env.*
+*.token
+*.secret
+*.pem
+*.key
+id_rsa*
+credentials*.json
+serviceAccount*.json
+oauth*.json
+ghp_*.txt
+github_token*
+*token*.txt
+*token*.json
+
+# ===== 本地工具/测试/日志（不上传）=====
+_h/
+_r/
+_t/
+*.log
