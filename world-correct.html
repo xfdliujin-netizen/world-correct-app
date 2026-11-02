@@ -9780,9 +9780,19 @@ const OcrHWR = (function(){
     });
   }
 
+  /* 创建推理会话：优先让 onnxruntime 把 wasm 推理放进 Web Worker，
+     主线程只负责画笔迹，避免推理期间 pointermove 排队造成卡顿 / 漏笔画。
+     某些浏览器（含 file:// 或 CSP 限制环境）不允许创建 worker，
+     此时自动关掉 proxy 退回主线程推理，保证识别能力不丢。 */
+  function createSession(buf, useProxy){
+    try{ ort.env.wasm.proxy = !!useProxy; }catch(e){}
+    return ort.InferenceSession.create(buf, { executionProviders: ['wasm'] });
+  }
+
   function init(){
     building = true;
     fire(0.02);
+    let modelBuf = null;
     return loadOrt().then(function(lib){
       ort = lib;
       ort.env.wasm.wasmPaths = ORT_BASE;
@@ -9791,8 +9801,12 @@ const OcrHWR = (function(){
       fire(0.06);
       return fetchBuf(MODEL_URLS, 0, function(p){ fire(0.06 + p * 0.84); });
     }).then(function(buf){
+      modelBuf = buf;
       fire(0.92);
-      return ort.InferenceSession.create(buf, { executionProviders: ['wasm'] });
+      return createSession(modelBuf, true).catch(function(err){
+        if(window.console) console.warn('ORT Worker 不可用，回退主线程推理', err);
+        return createSession(modelBuf, false);
+      });
     }).then(function(s){
       sess = s; ready = true; building = false;
       fire(1); flush(true);
