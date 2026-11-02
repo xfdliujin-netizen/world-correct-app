@@ -1,0 +1,8 @@
+# 系统垃圾文件
+Thumbs.db
+desktop.ini
+~$*
+*.tmp
+*.crdownload
+__pycache__/
+*.pyc
