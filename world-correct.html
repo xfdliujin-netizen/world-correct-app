@@ -363,6 +363,17 @@ button{
   flex:none;
 }
 .pane-write .dict-ref{position:absolute;right:18px;bottom:13px;margin:0;}
+/* 考卷题号：复习页左上角专属标记，录入页没有 —— 一眼分清两页 */
+.q-badge{
+  position:absolute;top:13px;left:16px;z-index:2;
+  font-size:12px;font-weight:700;color:#8a6d2f;
+  letter-spacing:.4px;white-space:nowrap;
+  background:rgba(255,255,255,.72);
+  border:1px dashed #d9c694;border-radius:9px;
+  padding:3px 10px;pointer-events:none;
+}
+/* 考卷田字格用虚线红框 + 浅纸色；录入页保持实线白底，形成视觉差异 */
+.pane-write .tian{border-style:dashed;background:#fffdf5;}
 
 .prompt{width:100%;text-align:center;}
 .pinyin{
@@ -692,7 +703,20 @@ button{
 }
 .sent-add:active{background:var(--primary-l);transform:scale(.96);}
 /* 录入页：输入框与语音报字并排，等宽等高 */
-.entry-card{padding:24px;}
+/* 录入页 = 白色工作台：顶部色条 + 标题栏，与米黄考卷页一眼分开 */
+.entry-card{position:relative;padding:24px;}
+.entry-card::before{
+  content:'';position:absolute;left:0;right:0;top:0;height:4px;
+  background:var(--primary);border-radius:var(--r-lg) var(--r-lg) 0 0;
+}
+.entry-head{
+  display:flex;align-items:center;gap:9px;flex:none;
+  padding-bottom:10px;margin-bottom:14px;
+  border-bottom:1px solid var(--line);
+}
+.entry-head-mark{width:4px;height:19px;border-radius:3px;background:var(--primary);flex:none;}
+.entry-head strong{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:.3px;}
+.entry-head-sub{font-size:12px;color:var(--muted);margin-left:auto;}
 .entry-form{display:flex;flex-direction:column;gap:16px;}
 .entry-save{width:100%;min-height:52px;margin-top:2px;}
 
@@ -1337,6 +1361,13 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   .pad-hint{min-height:20px;font-size:11px;gap:6px;}
   .dict-ref{font-size:10.5px;margin-top:-4px;}
   .dict-ref b{font-size:11px;}
+  /* 手机端：页码改挂卡片右上角，不再压在底部提示 / 工具按钮上造成干涉 */
+  .pane-write .dict-ref{
+    position:absolute;top:9px;right:12px;bottom:auto;left:auto;
+    margin:0;padding:0;font-size:10px;justify-content:flex-end;
+    max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .pane-write .dict-ref b{font-size:10.5px;}
   .pad-tools{gap:7px;}
   .pad-tools .btn{min-height:38px;padding:0 12px;font-size:12.5px;border-radius:11px;}
   .answer-top{gap:10px;padding-bottom:8px;}
@@ -1383,6 +1414,11 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   #btnSaveEntry{min-height:46px;}
 
   /* --- 字库页 --- */
+  /* 手机端整页滚动时，顶部说明栏固定在顶部栏下方，只有下方字卡跟着滚 */
+  #view-library .lib-bar{
+    position:sticky;top:calc(env(safe-area-inset-top) + 42px);z-index:20;
+    background:var(--surface);
+  }
   .lib-bar{gap:7px;padding:8px;border-radius:15px;}
   .seg{padding:3px;border-radius:11px;}
   .seg button{min-height:34px;padding:0 11px;font-size:12.5px;border-radius:9px;}
@@ -1545,10 +1581,10 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 }
 
 /* ============================================================
-   平板（≥700px）：复习页 / 录入页 锁定为一屏，卡片内不再上下滑动
-   —— 田字格尺寸保持不变，只压缩间距与留白
+   平板 / 横屏（≥601px）：复习页 / 录入页 锁定为一屏，卡片内不再上下滑动
+   —— 断点与手机的 ≤600px 严格衔接，避免 601–699px（iPad 分屏）出现锁定空档
    ============================================================ */
-@media (min-width:700px){
+@media (min-width:601px){
   /* --- 高度链：整页不滚动，卡片刚好一屏 ---
      高度用 JS 写入的 --app-h（真实可视高度），不用 100dvh —— iPad Safari 上
      dvh 会把工具栏遮住的区域也算进来，导致底部按钮被盖住看不到 */
@@ -1558,7 +1594,8 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   .app{height:var(--app-h, 100dvh);min-height:0;overflow:hidden;}
   .main{height:var(--app-h, 100dvh);min-height:0;overflow:hidden;}
   /* 700–939：底部有标签栏，给 tabbar 留出高度；≥940 有侧栏，底部只需呼吸空间 */
-  .main-inner{height:100%;min-height:0;padding:14px 22px calc(96px + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;}
+  /* 主内容区彻底锁定：不允许整屏上下滑动（字库页的字卡网格除外，它自己滚） */
+  .main-inner{height:100%;min-height:0;padding:14px 22px calc(96px + env(safe-area-inset-bottom));overflow:hidden;overscroll-behavior:contain;}
   @media (min-width:940px){ .main-inner{padding:20px 30px 18px;} }
   .view{min-height:0;overflow:hidden;}
   .round-head{margin-bottom:9px;flex-wrap:nowrap;}
@@ -1806,6 +1843,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 
               <!-- ---- 书写面 ---- -->
               <div class="pane pane-write">
+                <div class="q-badge" id="qBadge">第 1 题</div>
                 <div class="prompt">
                   <div class="pinyin" id="frontPinyin">bá</div>
                   <div class="hints" id="frontHints"></div>
@@ -1912,6 +1950,11 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
       <!-- ============ 2. 生字录入 ============ -->
       <section id="view-entry" class="view hidden">
         <div class="card entry-card">
+          <div class="entry-head">
+            <span class="entry-head-mark"></span>
+            <strong>生字录入</strong>
+            <span class="entry-head-sub">整理工作台 · 手写或输入定字</span>
+          </div>
           <div class="entry-grid">
 
             <div class="entry-preview">
@@ -8603,7 +8646,7 @@ function Pad(wrap, canvas){
   this.cur = null;
   this.pid = null;
   this.penIds = new Set();
-  this.penSeen = false;
+  this.lastMoveAt = 0;      // 最近一次 pointermove 时间，用于卡笔自愈
   this.w = 0; this.h = 0; this.dpr = 1;
   this.onInk = null;
 
@@ -8711,18 +8754,23 @@ function Pad(wrap, canvas){
   };
 
   canvas.addEventListener('pointerdown', function(e){
-    // 已有笔在写，忽略其它指针
-    if(self.pid !== null) return;
-    // 手掌过滤：只在用过 Apple Pencil 之后才按接触面积过滤触摸，
-    // 纯手指书写的用户永远不会被这条规则挡住
-    if(e.pointerType === 'touch'){
-      if(self.penIds.size > 0) return;
-      if(self.penSeen && (e.width || 0) > 46) return;
+    // 已有笔在写，忽略其它指针；但若该指针卡死（pointerup/cancel 丢失），
+    // 超过 2.5 秒没有任何移动就强制释放，避免田字格再也写不进去
+    if(self.pid !== null){
+      if(Date.now() - (self.lastMoveAt || 0) < 2500) return;
+      try{ canvas.releasePointerCapture(self.pid); }catch(err){}
+      self.pid = null; self.cur = null; self.penIds.clear();
+    }
+    // 手掌过滤：只在「此刻确实有 Apple Pencil 正在写」时才按接触面积过滤触摸。
+    // iPad 指尖宽度常达 40~70px，旧规则（用过笔后就一律按 46px 挡）
+    // 会把纯手指书写误判成手掌 —— 现在手指书写默认畅通。
+    if(e.pointerType === 'touch' && self.penIds.size > 0){
+      const contact = Math.max(e.width || 0, e.height || 0);
+      if(contact > 90) return;
     }
 
-    if(e.pointerType === 'pen') self.penSeen = true;
-
     e.preventDefault();
+    self.lastMoveAt = Date.now();
 
     self.rect = canvas.getBoundingClientRect();
 
@@ -8744,6 +8792,7 @@ function Pad(wrap, canvas){
   canvas.addEventListener('pointermove', function(e){
     if(self.pid !== e.pointerId || !self.cur) return;
     e.preventDefault();
+    self.lastMoveAt = Date.now();
 
     // 合并同一帧内的采样点
     const list = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
@@ -9161,8 +9210,10 @@ function renderCard(){
     gotBtn.innerHTML = '<svg class="ic"><use href="#i-check"/></svg>写对了';
   }
 
-  // 计数器
+  // 计数器 + 考卷题号角标
   $('counterLabel').textContent = '第 ' + (S.idx + 1) + ' / ' + S.queue.length + ' 字';
+  const qBadge = $('qBadge');
+  if(qBadge) qBadge.textContent = '第 ' + (S.idx + 1) + ' 题 / 共 ' + S.queue.length + ' 题';
 
   // 轮次圆点
   let dots = '';
@@ -9955,6 +10006,24 @@ let entryTimer = null;
 let entryPad = null;
 let entryMode = 'ink';          // ink: 手写中 | char: 已定字
 let entryRecTimer = null;
+let lastInkSig = null;          // 上次已识别过的笔迹指纹，避免同一组笔画重复跑模型
+
+/* 笔迹指纹：笔画数 + 采样点数 + 各笔首尾坐标散列。
+   笔画集合没变就不重新推理 —— 每停一笔都重跑 16MB 模型是卡顿的主因之一。 */
+function inkSignature(pad){
+  const st = pad.strokes;
+  let pts = 0, hash = 0;
+  for(let i = 0; i < st.length; i++){
+    const arr = st[i].pts;
+    pts += arr.length;
+    if(arr.length){
+      const a = arr[0], b = arr[arr.length - 1];
+      hash = (hash * 31 + Math.round(a.x) * 7 + Math.round(a.y) * 13
+                       + Math.round(b.x) * 3 + Math.round(b.y) * 5) | 0;
+    }
+  }
+  return st.length + ':' + pts + ':' + hash;
+}
 
 function initEntryPad(){
   if(entryPad) return;
@@ -9994,6 +10063,7 @@ function entryInkChanged(){
   const hint = $('entryHint');
 
   if(!entryPad || entryPad.isEmpty()){
+    lastInkSig = null;          // 清空田字格后，下一组相同笔画也要重新识别
     hint.innerHTML = '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>在格子里手写生字，或直接输入定字</span>';
     return;
   }
@@ -10002,8 +10072,10 @@ function entryInkChanged(){
     hint.innerHTML = '<span>已写 ' + n + ' 笔，继续写，2 笔以上自动识别…</span>';
     return;
   }
+  if(inkSignature(entryPad) === lastInkSig) return;   // 笔画没变，不重复推理
   hint.innerHTML = '<span>正在识别…</span>';
-  entryRecTimer = setTimeout(runEntryRecognize, 620);
+  // 900ms 静默：等一个字写完再识别，避免写到一半就启动推理阻塞下一笔
+  entryRecTimer = setTimeout(runEntryRecognize, 900);
 }
 
 function hwrReady(){
@@ -10022,6 +10094,8 @@ function runEntryRecognize(){
   if(entryMode !== 'ink' || !entryPad || entryPad.strokes.length < 2) return;
   // 正在落笔时不识别，等这一笔写完
   if(entryPad.pid !== null && entryPad.pid !== undefined) return;
+  // 同一组笔画已经出过结果，不再重复跑模型
+  if(inkSignature(entryPad) === lastInkSig) return;
   const hint = $('entryHint');
 
   if(!hwrReady()){
@@ -10044,8 +10118,12 @@ function doEntryRecognize(){
   if(entryPad.pid !== null && entryPad.pid !== undefined) return;
   const hint = $('entryHint');
   const t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+  const sig = inkSignature(entryPad);
 
   const finish = function(res){
+    // 推理期间用户又开始写了：丢弃这次结果，绝不覆盖新笔迹的状态
+    if(entryPad && entryPad.pid !== null && entryPad.pid !== undefined) return;
+    lastInkSig = sig;
     window.__hwrMs = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - t0);
     if(!res || !res.length){
       hint.innerHTML = '<span>没认出来，请写大一点、写清楚些，或直接在下方输入</span>';
