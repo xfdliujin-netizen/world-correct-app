@@ -1699,6 +1699,18 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   #view-library .lib-grid::-webkit-scrollbar{width:6px;}
   #view-library .lib-grid::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px;}
 }
+
+/* Reserve a separate header row for card badges at every screen size. */
+.lib-card{padding-top:36px;}
+@media (pointer:coarse), (min-width:600px){
+  #entryInkBtns .mini,#entryCharBtns .mini{min-height:48px;min-width:76px;padding:0 18px;font-size:16px;}
+  .cand-row{flex-wrap:wrap;gap:12px;}
+  #entryInkBtns{gap:12px;}
+}
+.word-entry{border:1px solid var(--line);border-radius:14px;padding:14px;}
+.word-entry summary{cursor:pointer;font-weight:600;min-height:36px;}
+.word-entry .desc{display:block;margin:8px 0;line-height:1.6;}
+.word-entry .input{width:100%;margin-bottom:10px;}
 </style>
 </head>
 
@@ -1991,6 +2003,12 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
             </div>
 
             <div class="entry-form">
+              <details class="word-entry">
+                <summary>整词录入</summary>
+                <label class="desc" for="entryWholeWord">输入 2～12 个汉字的词语，按字加入错字本，原词保留为组词。已有字保留复习进度。</label>
+                <input id="entryWholeWord" class="input" placeholder="例如：介绍、荷花（一次一个词）" maxlength="12" />
+                <button id="btnSaveWholeWord" class="btn btn-soft" type="button">将整词加入错字本</button>
+              </details>
               <div class="field">
                 <div class="row-2 char-row">
                   <input id="entryChar" class="input center char" type="text" maxlength="2"
@@ -8664,13 +8682,13 @@ function Pad(wrap, canvas){
   function pressureOf(e){
     if(e.pointerType === 'pen'){
       const p = (typeof e.pressure === 'number' && e.pressure > 0) ? e.pressure : 0.5;
-      return 0.5 + p * 1.05;          // 0.5 ~ 1.55
+      return 0.65 + p * 0.55;          // 0.5 ~ 1.55
     }
     return 1;
   }
 
   this.baseW = function(){
-    return Math.max(9, this.w * 0.062);
+    return Math.max(2.5, Math.min(5, this.w * 0.012));
   };
 
   this.penColor = function(){
@@ -8705,6 +8723,14 @@ function Pad(wrap, canvas){
     ctx.fill();
   }
 
+  function drawTail(pts){
+    if(pts.length < 2) return;
+    const a = pts[pts.length-2], b = pts[pts.length-1];
+    const ctx = self.ctx;
+    ctx.beginPath(); ctx.lineCap = 'round'; ctx.strokeStyle = self.penColor();
+    ctx.lineWidth = self.baseW() * b.p;
+    ctx.moveTo((a.x+b.x)/2, (a.y+b.y)/2); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
   this.redraw = function(){
     const ctx = self.ctx;
     ctx.clearRect(0, 0, this.w, this.h);
@@ -8714,6 +8740,7 @@ function Pad(wrap, canvas){
       for(let i = 1; i < st.pts.length; i++){
         lastMid = drawSeg(st.pts[i-1], st.pts[i], lastMid);
       }
+      drawTail(st.pts);
     });
   };
 
@@ -8797,7 +8824,7 @@ function Pad(wrap, canvas){
     // 合并同一帧内的采样点
     const list = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
     const pts = self.cur.pts;
-    const last = pts[pts.length - 1];
+    let last = pts[pts.length - 1];
 
     const feed = function(ev){
       const p = pos(ev);
@@ -8809,6 +8836,7 @@ function Pad(wrap, canvas){
         : { x:last.x, y:last.y };
       pts.push(p);
       drawSeg(pts[pts.length-2], p, prevMid);
+      last = p;
     };
 
     if(list && list.length){
@@ -8825,6 +8853,11 @@ function Pad(wrap, canvas){
     self.rect = null;
 
     if(self.cur){
+      if(e.type === 'pointerup'){
+        const p = pos(e); p.p = self.cur.pts[self.cur.pts.length-1].p;
+        self.cur.pts.push(p);
+      }
+      drawTail(self.cur.pts);
       if(self.cur.pts.length === 1) drawDot(self.cur.pts[0]);
       self.cur = null;
     }
@@ -10067,6 +10100,7 @@ function entryInkChanged(){
     hint.innerHTML = '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>在格子里手写生字，或直接输入定字</span>';
     return;
   }
+  if(entryPad.pid !== null) return;
   const n = entryPad.strokes.length;
   if(n < 2){
     hint.innerHTML = '<span>已写 ' + n + ' 笔，继续写，2 笔以上自动识别…</span>';
@@ -10075,7 +10109,7 @@ function entryInkChanged(){
   if(inkSignature(entryPad) === lastInkSig) return;   // 笔画没变，不重复推理
   hint.innerHTML = '<span>正在识别…</span>';
   // 900ms 静默：等一个字写完再识别，避免写到一半就启动推理阻塞下一笔
-  entryRecTimer = setTimeout(runEntryRecognize, 900);
+  entryRecTimer = setTimeout(runEntryRecognize, 1400);
 }
 
 function hwrReady(){
@@ -10123,6 +10157,7 @@ function doEntryRecognize(){
   const finish = function(res){
     // 推理期间用户又开始写了：丢弃这次结果，绝不覆盖新笔迹的状态
     if(entryPad && entryPad.pid !== null && entryPad.pid !== undefined) return;
+    if(entryMode !== 'ink' || inkSignature(entryPad) !== sig) return;
     lastInkSig = sig;
     window.__hwrMs = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - t0);
     if(!res || !res.length){
@@ -10251,6 +10286,29 @@ function clearEntrySentences(){
   if(b3){ b3.hidden = true; delete b3.dataset.open; }
   const add = $('btnAddSentence');
   if(add) add.classList.remove('hidden');
+}
+
+function saveWholeWord(){
+  const word = $('entryWholeWord').value.trim();
+  if(!/^[\u4e00-\u9fa5]{2,12}$/.test(word)){ toast('请输入 2～12 个汉字，一次录入一个词语'); return; }
+  const chars = Array.from(new Set(word));
+  let added = 0;
+  chars.slice().reverse().forEach(function(ch){
+    const existing = S.words.find(function(w){ return w.char === ch; });
+    if(existing){
+      if(existing.words.indexOf(word) === -1) existing.words.unshift(word);
+      existing.pinyin = pyOf(ch, existing.words) || existing.pinyin;
+      return;
+    }
+    const d = DICT[ch] || LEX[ch] || {};
+    const sentence = d.sentence || ('用「' + word + '」记住「' + ch + '」的写法。');
+    S.words.unshift({char:ch,pinyin:pyOf(ch,[word]) || '',words:[word],sentence:sentence,
+      sentences:[sentence],count:0,mastered:false,createdAt:Date.now()});
+    added++;
+  });
+  save(); renderLib();
+  $('entryWholeWord').value = '';
+  toast('已录入「' + word + '」：新增 ' + added + ' 个字，已有字保留进度');
 }
 
 function saveEntry(){
@@ -10514,6 +10572,17 @@ function parseSpokenChar(raw){
   const uniq = [];
   chars.forEach(function(c){ if(uniq.indexOf(c) === -1) uniq.push(c); });
 
+  const context = parts.length > 1 ? parts.slice(0,-1).join('') : '';
+  if(context && uniq.length === 1){
+    const heard = uniq[0];
+    const sound = function(c){ return (pyOf(c, [context]) || '').normalize('NFD').replace(/[\u0300-\u036f0-9\s]/g, '').toLowerCase(); };
+    const target = sound(heard);
+    const matches = Array.from(new Set(Array.from(context))).filter(function(c){ return c === heard || (target && sound(c) === target); });
+    if(matches.length){
+      const cands = Array.from(new Set(matches.concat(heard)));
+      return {ch:matches[0], strong:cands.length === 1, cands:cands};
+    }
+  }
   if(uniq.length === 1) return { ch:uniq[0], strong:true, cands:uniq };
   return { ch:uniq[uniq.length - 1], strong:false, cands:uniq };
 }
@@ -11280,7 +11349,7 @@ async function ghApi(method, path, body){
 function cloudPayload(){
   return {
     app: 'cuoziben', version: 1,
-    updatedAt: Date.now(),
+    updatedAt: localAt() || Date.now(),
     device: shortUA(),
     words: S.words.map(function(w){
       return {
@@ -11323,7 +11392,6 @@ async function cloudPush(){
   CLOUD.remoteAt = payload.updatedAt;
   CLOUD.lastErr = '';
   saveCloud();
-  try{ localStorage.setItem(META_KEY, JSON.stringify({ updatedAt: payload.updatedAt })); }catch(e){}
   return payload;
 }
 
@@ -11377,25 +11445,31 @@ async function cloudFindExisting(){
   return hits[0].gist;
 }
 
-/* 改动后延迟上传：攒 6 秒，且两次自动上传至少间隔 1 分钟（避免 Gist 历史里全是碎记录）；
-   手动点「立即备份」不受冷却限制 */
+/* 改动先存本机，停止操作 1.5 秒后上传；上传期间的新改动排队补传。 */
 function cloudSyncSoon(delay){
-  if(!cloudOn() || !CLOUD.auto || CLOUD.busy) return;
+  if(!cloudOn() || !CLOUD.auto) return;
+  if(CLOUD.busy){ CLOUD.dirty = true; return; }
   if(CLOUD.skipOnce){ CLOUD.skipOnce = false; return; }   // 刚拉下来的内容不必立刻回传
-  let wait = (delay == null ? 6000 : delay);
-  const since = Date.now() - (CLOUD.lastSync || 0);
-  if(since < 60000) wait = Math.max(wait, 60000 - since); // 冷却中：顺延到满 1 分钟
+  const wait = delay == null ? 1500 : delay;
   clearTimeout(CLOUD.timer);
+  CLOUD.queued = true;
+  refreshCloudUI();
   CLOUD.timer = setTimeout(function(){
+    CLOUD.timer = null;
     if(!cloudOn() || !CLOUD.auto) return;
     CLOUD.busy = true;
+    CLOUD.queued = false; CLOUD.dirty = false;
+    refreshCloudUI();
     cloudPush().then(function(){
       CLOUD.busy = false;
       CLOUD.retry = 0;
+      if(CLOUD.dirty) cloudSyncSoon();
       refreshCloudUI();
     }).catch(function(e){
       CLOUD.busy = false;
-      /* 网络抖动不打扰用户；只有令牌/权限问题才在界面上标红 */
+      CLOUD.queued = true;
+      CLOUD.lastErr = '备份未完成，数据已保存在本机';
+      /* 网络失败保留本机数据并重试 */
       if(e.status === 401 || e.status === 403){
         CLOUD.lastErr = e.status === 401 ? '令牌失效，请重新连接' : '权限不足（需 Gists 读写）';
       }else if((CLOUD.retry = (CLOUD.retry || 0) + 1) <= 3){
@@ -11478,12 +11552,13 @@ function cloudApplyRemote(remote, quiet){
 
 function refreshCloudUI(){
   const on = cloudOn();
+  const status = CLOUD.busy ? '正在备份…' : CLOUD.queued ? '本机已保存 · 等待云端备份' : CLOUD.auto ? '自动备份已开启' : '自动备份已关闭';
   const title = $('cloudTitle'), sub = $('cloudSub'), box = $('btnCloud');
   if(title) title.textContent = on ? '云同步' : '云同步（可选）';
   if(sub){
     sub.textContent = on
-      ? (CLOUD.lastErr ? ('同步出错：' + CLOUD.lastErr) : '已连接 · 上次备份 ' + agoText(CLOUD.lastSync))
-      : '连上 GitHub 后，每次改动都会自动备份到你的私有 Gist';
+      ? (CLOUD.lastErr ? ('同步出错：' + CLOUD.lastErr) : status + ' · 上次备份 ' + agoText(CLOUD.lastSync))
+      : '云端备份可选，数据先存本机；连接后可随时关闭自动上传';
   }
   if(box) box.classList.toggle('on', on);
 
@@ -11492,7 +11567,7 @@ function refreshCloudUI(){
     dot.classList.toggle('ok', on && !CLOUD.lastErr);
     dot.classList.toggle('err', !!CLOUD.lastErr);
   }
-  if(st) st.textContent = on ? (CLOUD.lastErr ? '同步异常' : '已连接') : '未连接';
+  if(st) st.textContent = on ? (CLOUD.lastErr ? '同步异常' : status) : '未连接';
   if(ss){
     ss.textContent = on
       ? (CLOUD.lastErr ? CLOUD.lastErr : ('上次备份 ' + agoText(CLOUD.lastSync) + ' · 本机 ' + S.words.length + ' 个字'))
@@ -11969,7 +12044,9 @@ function bind(){
   });
 
   // 录入
-  $('entryChar').addEventListener('input', onCharInput);
+  $('btnSaveWholeWord').addEventListener('click', saveWholeWord);
+  $('entryChar').addEventListener('input', function(e){ if(!e.isComposing) onCharInput(); });
+  $('entryChar').addEventListener('compositionend', onCharInput);
   $('entryWords').addEventListener('input', onWordsInput);
   $('entrySentence').addEventListener('input', syncSentInputs);
   $('entrySentence2').addEventListener('input', syncSentInputs);
@@ -12182,6 +12259,9 @@ function bind(){
   $('cloudAuto').addEventListener('change', function(){
     CLOUD.auto = !!this.checked;
     saveCloud();
+    if(CLOUD.auto) cloudSyncSoon(0);
+    else { clearTimeout(CLOUD.timer); CLOUD.timer = null; CLOUD.queued = false; }
+    refreshCloudUI();
     toast(CLOUD.auto ? '已开启：改动后自动上传' : '已关闭自动上传，只能手动同步');
   });
   $('btnCloudOff').addEventListener('click', function(){
@@ -12387,7 +12467,8 @@ function boot(){
 
   // 切回前台时刷新尺寸（iPad 分屏 / 旋转），并补一次健康探测
   document.addEventListener('visibilitychange', function(){
-    if(document.hidden) return;
+    if(document.hidden){ if(CLOUD.queued) cloudSyncSoon(0); return; }
+    if(cloudOn() && CLOUD.auto && localAt() > (CLOUD.remoteAt || CLOUD.lastSync)) cloudSyncSoon(0);
     setTimeout(function(){ if(pad) pad.resize(); if(entryPad) entryPad.resize(); }, 120);
     if(ENG.mode !== 'local' && !ENG.healthy && Date.now() >= ENG.retryAt) probeStrict();
   });

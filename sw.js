@@ -5,7 +5,7 @@
    ⚠️ 手写识别模型（PP-OCRv5，约 16MB）和 onnxruntime 运行时单独放在 MODEL_CACHE 里，
       不随 VER 变化删除 —— 否则每次 App 更新都要重新下载 16MB。
       只有模型 URL 换版本（如 @0.1.4 → @0.2.0）时，才把 MODEL_VER 加一让它重下。 */
-const VER = 'czb-v8';
+const VER = 'czb-v9';
 const MODEL_CACHE = 'czb-model-v1';   // 跨 App 版本保留
 const KEEP_CACHES = [VER, MODEL_CACHE];
 
