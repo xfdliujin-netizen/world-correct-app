@@ -1855,6 +1855,18 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 .word-entry summary{cursor:pointer;font-weight:600;min-height:36px;}
 .word-entry .desc{display:block;margin:8px 0;line-height:1.6;}
 .word-entry .input{width:100%;margin-bottom:10px;}
+
+/* iPhone landscape / iPad split view: allow content scrolling rather than clipping. */
+#view-game .game-chips{overflow:auto;max-height:140px;}
+#view-game .gq-text{overflow-wrap:anywhere;}
+@media(max-width:767px),(max-height:650px){
+  #view-game .game-card{max-height:none;overflow:visible;}
+  #view-game .game-body{overflow:visible;}
+  #view-game .game-grid{display:flex;flex-direction:column;overflow:visible;}
+  #view-game .game-write-col .tian-wrap{flex:none;}
+  #view-game .game-tian{width:min(64vw,280px);}
+  #view-game .game-tools button{min-height:44px;}
+}
 </style>
 </head>
 
@@ -8364,6 +8376,7 @@ function save(){
     localStorage.setItem(SIZE_KEY, String(S.roundSize));
   }catch(e){}
   touchMeta();
+  rtChanged();
   updateCounts();
   cloudSyncSoon();
 }
@@ -11564,7 +11577,7 @@ function gameCacheGet(ch){
   if(!c) return null;
   const i = (c.i || []).filter(function(s){ return typeof s === 'string' && s.indexOf(ch) >= 0; });
   const s = (c.s || []).filter(function(t){ return typeof t === 'string' && t.indexOf(ch) >= 0; });
-  if(!i.length && !s.length) return null;
+  if(i.length !== 3 || s.length !== 3 || new Set(i).size !== 3 || new Set(s).size !== 3) return null;
   return { idioms: i, sentences: s };
 }
 function gameCacheSet(ch, idioms, sentences){
@@ -11578,9 +11591,10 @@ function gameCacheSet(ch, idioms, sentences){
   try{ localStorage.setItem(GAME_STORE, JSON.stringify(all)); }catch(e){}
 }
 
-/* ---------- DeepSeek 调用（浏览器直连，已验证支持 CORS） ---------- */
+/* ---------- DeepSeek 调用（用户自己的 Key，仅保存在本机） ---------- */
 async function deepseekChat(sysPrompt, userPrompt){
   const res = await fetch('https://api.deepseek.com/chat/completions', {
+    signal: AbortSignal.timeout(60000),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AI.key },
     body: JSON.stringify({
@@ -11590,7 +11604,7 @@ async function deepseekChat(sysPrompt, userPrompt){
         { role: 'user',   content: userPrompt }
       ],
       temperature: 1.2,
-      max_tokens: 700,
+      max_tokens: 1200,
       response_format: { type: 'json_object' },
       stream: false
     })
@@ -11630,19 +11644,19 @@ async function aiGenFor(ch, retry){
     : user);
   const j = parseAiJson(txt);
   if(!j || !Array.isArray(j.idioms) || !Array.isArray(j.sentences)) throw new Error('AI 返回的格式不对');
-  const idioms = j.idioms.map(function(s){ return String(s).trim(); })
-    .filter(function(s){ return s.indexOf(ch) >= 0 && s.length >= 3 && s.length <= 10; });
-  const sentences = j.sentences.map(function(s){ return String(s).trim(); })
-    .filter(function(s){ return s.indexOf(ch) >= 0 && s.length >= 8 && s.length <= 60; });
+  const idioms = Array.from(new Set(j.idioms.filter(s=>typeof s==='string').map(s=>s.trim())))
+    .filter(function(s){ return s.indexOf(ch) >= 0 && s.length === 4; });
+  const sentences = Array.from(new Set(j.sentences.filter(s=>typeof s==='string').map(s=>s.trim())))
+    .filter(function(s){ return s.indexOf(ch) >= 0 && s.replace(/[^\u3400-\u9fff]/g,'').length >= 15 && s.replace(/[^\u3400-\u9fff]/g,'').length <= 30; });
   return { idioms: idioms.slice(0, 3), sentences: sentences.slice(0, 3) };
 }
 
 async function aiGen(ch){
   let r = await aiGenFor(ch, false);
-  if(!r.idioms.length || !r.sentences.length){
+  if(r.idioms.length !== 3 || r.sentences.length !== 3){
     r = await aiGenFor(ch, true);      // 有不达标条目 → 提醒模型自查重试一次
   }
-  if(!r.idioms.length && !r.sentences.length) throw new Error('AI 没有生成包含「' + ch + '」的内容');
+  if(r.idioms.length !== 3 || r.sentences.length !== 3) throw new Error('未能生成 3 个规范成语和 3 个合格句子。该字可能没有足够的常见成语，请换字或重试；不会用生造成语凑数。');
   return r;
 }
 
@@ -12010,8 +12024,7 @@ function bindGame(){
 
 /* ============================================================
    10.5 云同步（GitHub Gist，纯前端直连，零成本）
-   —— 发布：数据改动后自动上传；订阅：App 打开期间每 20 秒探测云端，
-      其他设备的改动自动同步过来（cloudSubTick）
+   —— GitHub Gist 仅作备份；实时同步使用 WebSocket Pub/Sub。
    ============================================================ */
 const CLOUD_KEY  = 'hanzi.cloud.v1';     // { token, gistId, auto, lastSync }
 const META_KEY   = 'hanzi.meta.v1';      // { updatedAt } 本地最后改动时间
@@ -12254,48 +12267,10 @@ async function cloudCheckOnOpen(){
   }
 }
 
-/* ---- pub/sub 订阅：App 打开期间持续探测云端（约 20 秒一次）----
-   发布 = cloudSyncSoon（本机改动后自动上传，已有）；
-   订阅 = 这里轮询 Gist：发现别的设备推了新版本——
-     · 本机没有未上传的改动 → 静默应用，toast 告知；
-     · 云端明显更新（本机落后很多）→ 弹窗问；
-     · 本机也有新改动 → 本机先推（与打开时的策略一致）。 */
-let cloudSubTimer = null;
-const CLOUD_SUB_MS = 20000;
-
-function startCloudSub(){
-  if(cloudSubTimer) return;
-  cloudSubTimer = setInterval(cloudSubTick, CLOUD_SUB_MS);
-}
-function stopCloudSub(){
-  clearInterval(cloudSubTimer);
-  cloudSubTimer = null;
-}
-
-async function cloudSubTick(){
-  if(!cloudOn() || !CLOUD.auto) return;         // 未连接 / 关了自动同步：不订阅
-  if(document.hidden || CLOUD.busy || CLOUD.queued) return;   // 后台 / 正在传：跳过本轮
-  if(CLOUD.pending) return;                     // 冲突弹窗还没处理
-  try{
-    const remote = await cloudFetch();
-    if(!remote || !Array.isArray(remote.words) || !remote.words.length) return;
-    const rAt = remote.updatedAt || 0;
-    if(rAt <= (CLOUD.remoteAt || 0)) return;    // 没有新版本（自己刚推的也挡在这里）
-    const local = localAt();
-    if(local <= (CLOUD.remoteAt || 0) + 3000){
-      /* 本机干净：直接应用云端新版本，这就是「订阅生效」 */
-      CLOUD.remoteAt = rAt;
-      cloudApplyRemote(remote, true);
-      toast('已同步其他设备的改动（云端共 ' + remote.words.length + ' 个字）');
-    }else if(rAt > local + 3000){
-      showCloudConflict(remote);
-    }else{
-      /* 本机也有未上传的改动：先推本机，保持「谁在线谁先传」 */
-      cloudPush().then(function(){ refreshCloudUI(); }).catch(function(){});
-    }
-  }catch(e){ /* 网络 / 限流：静默，下个周期再试 */ }
-}
-window.__cloudSubTick = cloudSubTick;   // 测试钩子
+/* 实时订阅由 WebSocket 推送；Gist 仅用于持久备份。 */
+function startCloudSub(){}
+function stopCloudSub(){}
+async function cloudSubTick(){}
 
 function showCloudConflict(remote){
   CLOUD.pending = remote;
@@ -12363,7 +12338,7 @@ function refreshCloudUI(){
   if(stats && on){
     stats.innerHTML = '本机 <b>' + S.words.length + '</b> 个字 · 上次备份 <b>' + agoText(CLOUD.lastSync) + '</b>' +
       '<br>云端文件：Gist ' + String(CLOUD.gistId).slice(0, 8) + '…（可在 GitHub 的 Gist 列表里看到历史版本）' +
-      '<br>实时订阅：' + (CLOUD.auto ? '其他设备的改动约 20 秒内自动同步过来' : '已关闭（开启后多设备自动保持一致）');
+      '<br>实时订阅：' + (CLOUD.auto ? '实时同步请配置上方 Pub/Sub 连接' : '已关闭（开启后多设备自动保持一致）');
   }
   const auto = $('cloudAuto');
   if(auto) auto.checked = !!CLOUD.auto;
@@ -13187,6 +13162,94 @@ function syncAppHeight(){
   if(h > 0) document.documentElement.style.setProperty('--app-h', h + 'px');
 }
 
+// Loaded inside the app closure; the browser keeps a durable outbox across reloads.
+const RT_KEY='hanzi.pubsub.v1', RT_OUT='hanzi.pubsub.outbox.v1';
+const RT={ws:null, revision:0, ready:false, dirty:!!localStorage.getItem(RT_OUT), seq:0, flight:null, pending:null, timer:null, retry:0};
+function rtConfig(){try{return JSON.parse(localStorage.getItem(RT_KEY)||'{}');}catch(e){return {};}}
+function rtStatus(text){const el=$('rtStatus');if(el) el.textContent=text;}
+function rtChanged(){
+  RT.dirty=true; RT.seq++;
+  localStorage.setItem(RT_OUT,'1');
+  clearTimeout(RT.publishTimer); RT.publishTimer=setTimeout(rtPublish,300);
+}
+function rtPublish(){
+  if(!RT.ready || !RT.dirty || RT.pending || RT.flight!==null) return;
+  RT.flight=RT.seq;
+  RT.ws.send(JSON.stringify({type:'publish',base:RT.revision,seq:RT.seq,words:S.words}));
+  rtStatus('正在发布改动…');
+}
+function rtApply(m){
+  if(!Array.isArray(m.words)) return;
+  const words=m.words.map(normalizeWord);
+  if(words.some(w=>!w)){rtStatus('同步内容格式不正确');return;}
+  S.words=words;
+  localStorage.setItem(KEY,JSON.stringify(words));
+  localStorage.setItem(META_KEY,JSON.stringify({updatedAt:m.updatedAt}));
+  updateCounts(); renderLib(); startRound(null);
+  if(S.tab==='game'){GAME.items=[];renderGameChips();gameShowGuide();renderGameIdle();}
+  rtStatus('已实时同步 · 版本 '+m.revision);
+}
+function rtConnect(){
+  clearTimeout(RT.timer);
+  const c=rtConfig(); if(!c.url || !c.secret) return;
+  if(RT.ws){RT.ws.onclose=null;RT.ws.close();}
+  RT.ready=false;RT.flight=null;
+  let ws;
+  try{ws=new WebSocket(c.url);}catch(e){rtStatus('同步地址无效');return;}
+  RT.ws=ws; rtStatus('正在连接实时同步…');
+  ws.onopen=()=>ws.send(JSON.stringify({type:'subscribe',secret:c.secret}));
+  ws.onmessage=e=>{
+    let m;try{m=JSON.parse(e.data);}catch(e){return;}
+    if(m.type==='ack'){
+      RT.revision=m.revision;RT.flight=null;
+      if(m.seq===RT.seq){RT.dirty=false;localStorage.removeItem(RT_OUT);}
+      rtStatus('实时同步已连接 · 版本 '+m.revision);rtPublish();return;
+    }
+    if(m.type==='error'){RT.flight=null;rtStatus(m.message);return;}
+    if(m.type!=='snapshot' && m.type!=='conflict') return;
+    const previous=RT.revision; RT.revision=m.revision;RT.ready=true;RT.retry=0;
+    if(m.words===null){rtChanged();rtPublish();return;}
+    if(RT.dirty && JSON.stringify(S.words)===JSON.stringify(m.words)){
+      RT.dirty=false;RT.flight=null;localStorage.removeItem(RT_OUT);
+    }else if(RT.dirty){
+      if(m.type==='conflict' || m.revision!==previous){
+        RT.flight=null;RT.pending=m;$('rtConflict').hidden=false;
+        rtStatus('两台设备都有改动，请选择保留哪一份');return;
+      }
+      rtPublish();return;
+    }else rtApply(m);
+    rtStatus('实时同步已连接 · 版本 '+m.revision);
+  };
+  ws.onerror=()=>rtStatus('连接失败，数据已保存在本机');
+  ws.onclose=e=>{
+    RT.ready=false;RT.flight=null;
+    if(e.code===1008){rtStatus('同步口令无效，请检查配置');return;}
+    rtStatus('连接断开，正在重连…');
+    RT.timer=setTimeout(rtConnect,Math.min(30000,1000*2**Math.min(RT.retry++,5)));
+  };
+}
+function rtInit(){
+  const section=document.createElement('section');section.className='card';
+  section.style.cssText='padding:16px;margin:12px 0';
+  section.innerHTML='<h3>实时同步 · Pub/Sub</h3><p>各设备填写相同地址与家庭口令。Gist 另作备份。</p><label>同步地址<input id="rtUrl" type="url" placeholder="wss://sync.example.com" style="width:100%;min-height:44px"></label><label>家庭口令<input id="rtSecret" type="password" autocomplete="off" style="width:100%;min-height:44px"></label><button class="btn" id="rtSave">连接实时同步</button><button class="btn" id="rtOff">断开</button><p id="rtStatus" role="status">尚未配置实时同步</p><div id="rtConflict" hidden><p>本机和云端都有改动，未自动覆盖。</p><button id="rtRemote" class="btn">使用云端</button><button id="rtLocal" class="btn">保留本机并发布</button></div>';
+  const host=$('cloudToken').closest('.modal') || $('cloudToken').parentElement.parentElement;
+  (host.querySelector('.modal-body') || $('cloudToken').parentElement.parentElement).prepend(section);
+  const c=rtConfig();$('rtUrl').value=c.url||'';$('rtSecret').value=c.secret||'';
+  $('rtSave').onclick=()=>{
+    const url=$('rtUrl').value.trim(),secret=$('rtSecret').value.trim();
+    let u;try{u=new URL(url);}catch(e){toast('请填写有效的 WebSocket 地址');return;}
+    if(u.protocol!=='wss:' && !(u.protocol==='ws:' && ['localhost','127.0.0.1'].includes(u.hostname))){toast('请使用 wss:// 安全连接');return;}
+    if(secret.length<24){toast('家庭口令至少 24 个字符');return;}
+    localStorage.setItem(RT_KEY,JSON.stringify({url,secret}));RT.revision=0;RT.pending=null;$('rtConflict').hidden=true;rtConnect();
+  };
+  $('rtOff').onclick=()=>{localStorage.removeItem(RT_KEY);clearTimeout(RT.timer);if(RT.ws){RT.ws.onclose=null;RT.ws.close();}RT.ready=false;rtStatus('实时同步已断开');};
+  $('rtRemote').onclick=()=>{const m=RT.pending;RT.pending=null;RT.dirty=false;localStorage.removeItem(RT_OUT);$('rtConflict').hidden=true;rtApply(m);};
+  $('rtLocal').onclick=()=>{RT.pending=null;$('rtConflict').hidden=true;rtPublish();};
+  window.addEventListener('online',rtConnect);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden) rtConnect();});
+  rtConnect();
+}
+
 function boot(){
   syncAppHeight();
   window.addEventListener('resize', syncAppHeight);
@@ -13199,6 +13262,7 @@ function boot(){
   loadEngineMode();
   loadCloud();
   loadAi();
+  rtInit();
   updateCounts();
   initPad();
   bind();
@@ -13215,7 +13279,7 @@ function boot(){
   // 打开时比对一次云端备份（云端更新就弹窗问，不自动覆盖本地）
   setTimeout(cloudCheckOnOpen, 2200);
 
-  // pub/sub 订阅：App 打开期间每 20 秒探测云端，其他设备的改动自动同步过来
+  // WebSocket 订阅在 rtInit 中启动
   startCloudSub();
 
   // 空闲时预装载手写识别数据（一次性约 200ms），第一次手写识别就不用等
