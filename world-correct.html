@@ -10567,7 +10567,7 @@ function saveWholeWord(){
       return;
     }
     const d = DICT[ch] || LEX[ch] || {};
-    const sentence = d.sentence || ('用「' + word + '」记住「' + ch + '」的写法。');
+    const sentence = '';
     S.words.unshift({char:ch,pinyin:pyOf(ch,[word]) || '',words:[word],sentence:sentence,
       sentences:[sentence],count:0,mastered:false,createdAt:Date.now()});
     added++;
@@ -11695,36 +11695,29 @@ function gameShowGuide(){
 }
 
 async function startGame(ch, force){
-  if(GAME.busy){toast('正在出题，请稍候');return;}
-  GAME.char = ch;
-  renderGameChips();
-
-  let data = force ? null : gameCacheGet(ch);
-  if(!data){
-    GAME.busy = true;
-    GAME.pendingChar = ch;
-    renderGameLoading(ch);
-    try{
-      data = await aiGen(ch);
-      gameCacheSet(ch, data.idioms, data.sentences, data.words);
-      renderGameChips();
-    }catch(e){
-      GAME.busy = false; GAME.pendingChar = '';
-      renderGameError(ch, e);
-      return;
+  if(GAME.busy)return;
+  GAME.busy=true;GAME.char=ch;GAME.items=[];GAME.states=[];
+  renderGameLoading(ch);
+  const pool=gameChars().filter(c=>c!==ch).sort(()=>Math.random()-.5);
+  const chars=[ch].concat(pool).slice(0,3);
+  try{
+    const results=await Promise.allSettled(chars.map(async c=>{
+      let data=force?null:gameCacheGet(c);
+      if(!data){data=await aiGen(c);gameCacheSet(c,data.idioms,data.sentences);}
+      return {char:c,data};
+    }));
+    const ready=results.filter(r=>r.status==='fulfilled').map(r=>r.value);
+    if(!ready.length)throw results[0].reason;
+    // Six prompts: spread across available characters and vary the answer each turn.
+    for(let i=0;i<3;i++){
+      const source=ready[i%ready.length];
+      GAME.items.push({type:'idiom',text:source.data.idioms[i],char:source.char});
+      GAME.items.push({type:'sentence',text:source.data.sentences[i],char:source.char});
     }
-    GAME.busy = false; GAME.pendingChar = '';
-    if(GAME.char !== ch) return;         // 等待期间用户已换别的字
-  }
-
-  GAME.items = [];
-  data.idioms.forEach(function(t){ GAME.items.push({ type: 'idiom', text: t }); });
-  data.sentences.forEach(function(t){ GAME.items.push({ type: 'sentence', text: t }); });
-  GAME.items.sort(()=>Math.random()-.5);
-  GAME.idx = 0;
-  GAME.states = GAME.items.map(function(){ return ''; });
-  GAME.hintOn = false;
-  renderGameQuest();
+    GAME.items.sort(()=>Math.random()-.5);GAME.idx=0;
+    GAME.states=GAME.items.map(()=> '');GAME.hintOn=false;renderGameQuest();
+  }catch(e){renderGameError(ch,e);}
+  finally{GAME.busy=false;}
 }
 
 function renderGameLoading(ch){
@@ -11765,6 +11758,7 @@ function renderGameQuest(){
   const q = $('gameQuest');
   if(!q || !GAME.items.length) return;
   const item = GAME.items[GAME.idx];
+  GAME.char=item.char || GAME.char;
   const st = GAME.states[GAME.idx];
   let dots = '';
   GAME.states.forEach(function(s, k){

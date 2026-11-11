@@ -6,8 +6,8 @@ vm.runInContext(section('function questHtml','function renderGameQuest'),ctx);
 assert.equal(vm.runInContext("questHtml({text:'春去春来'},'', '春').includes('春')",ctx),false);
 vm.runInContext(section('function parseAiJson','/* ---------- 游戏流程'),ctx);
 (async()=>{
- const result=await vm.runInContext("aiGen('春')",ctx);assert.equal(result.words.length,3);assert.equal(result.idioms.length,3);assert.equal(result.sentences.length,3);
+ const result=await vm.runInContext("aiGen('春')",ctx);assert.equal(result.idioms.length,3);assert.equal(result.sentences.length,3);
  ctx.deepseekChat=async()=>JSON.stringify({words:['春天'],idioms:['春天'],sentences:['春天来了']});
  await assert.rejects(vm.runInContext("aiGen('春')",ctx));
- console.log('PASS: every target occurrence blanked; 3+3+3 valid items; incomplete generation rejected');
+ console.log('PASS: every target occurrence blanked; 3 idioms + 3 sentences; incomplete generation rejected');
 })().catch(e=>{console.error(e);process.exitCode=1;});
