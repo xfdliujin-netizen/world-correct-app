@@ -1541,6 +1541,19 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   .lib-card .lc-py{font-size:12.5px;}
   .lib-card .lc-char{padding:2px 0;}
   .lib-card .lc-words{font-size:11px;}
+
+  /* --- 填词游戏：单列纵向排，页面正常滚动 --- */
+  .game-card{padding:12px 24px 14px;}
+  .game-head{margin-bottom:10px;padding-bottom:8px;}
+  .game-head-sub{display:none;}
+  .game-guide{padding:26px 6px;}
+  .game-chips{max-height:none;overflow:visible;}
+  .game-quest{min-height:0;padding:14px;gap:10px;}
+  .gq-text{font-size:24px;letter-spacing:1.5px;}
+  .gq-text.is-sent{font-size:17px;}
+  .game-write-col .tian-wrap{flex:none;}
+  .game-tian{width:min(var(--pad),82vw);}
+  .game-tools .mini{min-height:36px;padding:0 12px;}
 }
 
 /* ============================================================
@@ -1808,6 +1821,27 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   }
   #view-library .lib-grid::-webkit-scrollbar{width:6px;}
   #view-library .lib-grid::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px;}
+
+  /* --- 填词游戏：一屏锁定，左题右写；字多时 chips 自己滚 --- */
+  #view-game{justify-content:stretch;}
+  .game-card{
+    flex:1;min-height:0;max-height:100%;overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  .game-body{overflow:hidden;}
+  .game-grid{
+    flex:1;min-height:0;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) min(var(--pad-entry),44%);
+    gap:clamp(16px,2.2vw,32px);
+    align-items:stretch;
+  }
+  .game-quest-col{gap:9px;}
+  .game-write-col .tian{width:min(var(--pad-entry),100%);}
+  .game-quest{min-height:0;padding:16px 18px;gap:11px;}
+  .gq-text{font-size:clamp(26px,2.6vw,34px);}
+  .gq-text.is-sent{font-size:clamp(19px,1.8vw,24px);}
+  .game-tools .mini{min-height:37px;padding:0 14px;font-size:13.5px;}
 }
 
 /* Reserve a separate header row for card badges at every screen size. */
@@ -11743,8 +11777,7 @@ async function cloudCheckOnOpen(){
 }
 
 function showCloudConflict(remote){
-  CLOUD.pending = remote;
-  const el = $('cloudPullText');
+  CLOUD.pending = remote;  const el = $('cloudPullText');
   if(el){
     el.innerHTML = '云端备份有 <b>' + remote.words.length + '</b> 个字，最后更新于 <b>' +
       dateText(remote.updatedAt) + '</b>；本机现在有 <b>' + S.words.length + '</b> 个字。' +
