@@ -11776,8 +11776,52 @@ async function cloudCheckOnOpen(){
   }
 }
 
+/* ---- pub/sub 订阅：App 打开期间持续探测云端（约 20 秒一次）----
+   发布 = cloudSyncSoon（本机改动后自动上传，已有）；
+   订阅 = 这里轮询 Gist：发现别的设备推了新版本——
+     · 本机没有未上传的改动 → 静默应用，toast 告知；
+     · 云端明显更新（本机落后很多）→ 弹窗问；
+     · 本机也有新改动 → 本机先推（与打开时的策略一致）。 */
+let cloudSubTimer = null;
+const CLOUD_SUB_MS = 20000;
+
+function startCloudSub(){
+  if(cloudSubTimer) return;
+  cloudSubTimer = setInterval(cloudSubTick, CLOUD_SUB_MS);
+}
+function stopCloudSub(){
+  clearInterval(cloudSubTimer);
+  cloudSubTimer = null;
+}
+
+async function cloudSubTick(){
+  if(!cloudOn() || !CLOUD.auto) return;         // 未连接 / 关了自动同步：不订阅
+  if(document.hidden || CLOUD.busy || CLOUD.queued) return;   // 后台 / 正在传：跳过本轮
+  if(CLOUD.pending) return;                     // 冲突弹窗还没处理
+  try{
+    const remote = await cloudFetch();
+    if(!remote || !Array.isArray(remote.words) || !remote.words.length) return;
+    const rAt = remote.updatedAt || 0;
+    if(rAt <= (CLOUD.remoteAt || 0)) return;    // 没有新版本（自己刚推的也挡在这里）
+    const local = localAt();
+    if(local <= (CLOUD.remoteAt || 0) + 3000){
+      /* 本机干净：直接应用云端新版本，这就是「订阅生效」 */
+      CLOUD.remoteAt = rAt;
+      cloudApplyRemote(remote, true);
+      toast('已同步其他设备的改动（云端共 ' + remote.words.length + ' 个字）');
+    }else if(rAt > local + 3000){
+      showCloudConflict(remote);
+    }else{
+      /* 本机也有未上传的改动：先推本机，保持「谁在线谁先传」 */
+      cloudPush().then(function(){ refreshCloudUI(); }).catch(function(){});
+    }
+  }catch(e){ /* 网络 / 限流：静默，下个周期再试 */ }
+}
+window.__cloudSubTick = cloudSubTick;   // 测试钩子
+
 function showCloudConflict(remote){
-  CLOUD.pending = remote;  const el = $('cloudPullText');
+  CLOUD.pending = remote;
+  const el = $('cloudPullText');
   if(el){
     el.innerHTML = '云端备份有 <b>' + remote.words.length + '</b> 个字，最后更新于 <b>' +
       dateText(remote.updatedAt) + '</b>；本机现在有 <b>' + S.words.length + '</b> 个字。' +
