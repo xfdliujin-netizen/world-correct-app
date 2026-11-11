@@ -11956,8 +11956,8 @@ async function aiTest(){
     if(($('aiKey').value || '').trim()) aiSave();
   }catch(e){
     toast('连接失败：' + ((e && e.message) || '网络错误'));
+    AI.key = old;
   }
-  AI.key = old;
   saveAi();
   btn.disabled = false;
   btn.textContent = label;

@@ -21,7 +21,23 @@ const fs=require('node:fs');
   await page.getByRole('button',{name:'读一读，下一题'}).waitFor();
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error(name+' horizontal overflow');
   if(errors.length)throw Error(errors.join(';'));
-  await page.screenshot({path:name+'-game.png',fullPage:true});console.log('PASS '+name+' fill/answer/next + no overflow');await page.close();
+  await page.screenshot({path:name+'-game.png',fullPage:true});
+  await page.locator('[data-tab="library"]:visible').last().click();
+  await page.locator('.tag-learning').filter({hasText:'待复习'}).waitFor();
+  let apiCalls=0;
+  await page.route('https://api.deepseek.com/chat/completions',async route=>{
+    apiCalls++;const request=route.request().postDataJSON();
+    if(!request.messages[1].content.includes('每句必须完整包含'))throw Error('Missing sentence prompt');
+    await route.fulfill({json:{choices:[{message:{content:JSON.stringify({sentences:['春风轻轻拂过河岸，柳树的嫩芽在阳光里慢慢舒展。','春雨落在松软的泥土上，沉睡的种子悄悄伸出了根。','春天的燕子掠过清澈的湖面，翅膀剪开一片金色晨光。']})}}]}});
+  });
+  await page.locator('[data-tab="entry"]:visible').last().click();
+  await page.locator('#entryChar').fill('春');
+  await page.waitForFunction(()=>document.getElementById('entrySentence').value.includes('春风轻轻'));
+  if(apiCalls!==1)throw Error('Entry did not use DeepSeek');
+  await page.locator('#entrySentence').fill('春天是孩子们喜欢的季节。');
+  await page.locator('#btnEntryAi').click();
+  await page.waitForFunction(()=>document.getElementById('entrySentence').value.includes('春风轻轻'));
+  console.log('PASS '+name+' auto game, pinyin, answer/next, tab row, learning badge, DeepSeek entry generation/retry + no overflow');await page.close();
  }
  await browser.close();
 })().catch(e=>{console.error(e);process.exitCode=1;});
