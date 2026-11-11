@@ -11532,8 +11532,485 @@ function restore(){
 }
 
 /* ============================================================
+   10.4 填词游戏（AI 出题 · 挖空填字）
+   —— 根据录入的生字，用 DeepSeek 生成 3 个成语 + 3 个句子，
+      把生字挖空，手写填对才算过关；题目按字缓存在本机，不重复花钱。
+   ============================================================ */
+const AI_STORE  = 'hanzi.ai.v1';      // { key } —— DeepSeek API Key，只存本机
+const GAME_STORE = 'hanzi.game.v1';   // { 字: {i:[成语], s:[句子], at:时间} }
+const AI = { key:'' };
+const GAME = {
+  pad:null,                 // 游戏专属手写板（与录入板相互独立）
+  char:'',                  // 当前出题的生字
+  items:[], idx:0, states:[],   // 每题状态：'' | 'ok' | 'skip'
+  busy:false, pendingChar:'',
+  recTimer:null, lastSig:null,
+  hintOn:false              // 当前题是否已亮过答案
+};
+
+function loadAi(){
+  try{ AI.key = (JSON.parse(localStorage.getItem(AI_STORE) || '{}').key) || ''; }catch(e){}
+}
+function saveAi(){
+  try{ localStorage.setItem(AI_STORE, JSON.stringify({ key: AI.key })); }catch(e){}
+}
+
+/* ---------- 题目缓存（按字，最多 60 个字） ---------- */
+function gameCacheAll(){
+  try{ return JSON.parse(localStorage.getItem(GAME_STORE) || '{}') || {}; }catch(e){ return {}; }
+}
+function gameCacheGet(ch){
+  const c = gameCacheAll()[ch];
+  if(!c) return null;
+  const i = (c.i || []).filter(function(s){ return typeof s === 'string' && s.indexOf(ch) >= 0; });
+  const s = (c.s || []).filter(function(t){ return typeof t === 'string' && t.indexOf(ch) >= 0; });
+  if(!i.length && !s.length) return null;
+  return { idioms: i, sentences: s };
+}
+function gameCacheSet(ch, idioms, sentences){
+  const all = gameCacheAll();
+  all[ch] = { i: idioms, s: sentences, at: Date.now() };
+  const keys = Object.keys(all);
+  if(keys.length > 60){
+    keys.sort(function(a, b){ return (all[a].at || 0) - (all[b].at || 0); });
+    keys.slice(0, keys.length - 60).forEach(function(k){ delete all[k]; });
+  }
+  try{ localStorage.setItem(GAME_STORE, JSON.stringify(all)); }catch(e){}
+}
+
+/* ---------- DeepSeek 调用（浏览器直连，已验证支持 CORS） ---------- */
+async function deepseekChat(sysPrompt, userPrompt){
+  const res = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AI.key },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user',   content: userPrompt }
+      ],
+      temperature: 1.2,
+      max_tokens: 700,
+      response_format: { type: 'json_object' },
+      stream: false
+    })
+  });
+  let data = null;
+  try{ data = await res.json(); }catch(e){}
+  if(!res.ok){
+    const err = new Error((data && data.error && data.error.message) || ('HTTP ' + res.status));
+    err.status = res.status;
+    throw err;
+  }
+  return (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+}
+
+function parseAiJson(txt){
+  if(!txt) return null;
+  let t = String(txt).trim();
+  const m = t.match(/\{[\s\S]*\}/);
+  if(m) t = m[0];
+  try{ return JSON.parse(t); }catch(e){ return null; }
+}
+
+async function aiGenFor(ch, retry){
+  const sys = '你是一位资深语文老师，为小学生设计硬笔书法练习素材。你的回答永远是一个严格的 JSON 对象，不含任何其他文字。';
+  const user =
+    '请为生字「' + ch + '」生成练习素材：\n' +
+    '1. 3 个包含「' + ch + '」字的成语；\n' +
+    '2. 3 个包含「' + ch + '」字的句子。\n' +
+    '要求：\n' +
+    '- 成语和句子必须完整包含用户提供的生字「' + ch + '」；\n' +
+    '- 句意优美、积极向上，带有画面感，兼具科普或文学色彩（避免干巴巴的口号）；\n' +
+    '- 句子长度适中（15～30 字），适合作为硬笔书法练习的范本；\n' +
+    '- 成语选常见、用法规范的，不要生造。\n' +
+    '只输出 JSON：{"idioms":["","",""],"sentences":["","",""]}';
+  const txt = await deepseekChat(sys, retry
+    ? '注意：上一次的结果里有不包含「' + ch + '」字的条目，请严格自查每一项都必须完整包含「' + ch + '」这个字。\n' + user
+    : user);
+  const j = parseAiJson(txt);
+  if(!j || !Array.isArray(j.idioms) || !Array.isArray(j.sentences)) throw new Error('AI 返回的格式不对');
+  const idioms = j.idioms.map(function(s){ return String(s).trim(); })
+    .filter(function(s){ return s.indexOf(ch) >= 0 && s.length >= 3 && s.length <= 10; });
+  const sentences = j.sentences.map(function(s){ return String(s).trim(); })
+    .filter(function(s){ return s.indexOf(ch) >= 0 && s.length >= 8 && s.length <= 60; });
+  return { idioms: idioms.slice(0, 3), sentences: sentences.slice(0, 3) };
+}
+
+async function aiGen(ch){
+  let r = await aiGenFor(ch, false);
+  if(!r.idioms.length || !r.sentences.length){
+    r = await aiGenFor(ch, true);      // 有不达标条目 → 提醒模型自查重试一次
+  }
+  if(!r.idioms.length && !r.sentences.length) throw new Error('AI 没有生成包含「' + ch + '」的内容');
+  return r;
+}
+
+/* ---------- 游戏流程 ---------- */
+function initGamePad(){
+  if(GAME.pad) return;
+  const wrap = $('gameTian'), cv = $('gamePadCanvas');
+  if(!wrap || !cv) return;
+  GAME.pad = new Pad(wrap, cv);
+  GAME.pad.onInk = gameInkChanged;
+}
+
+/* 出题字源：未掌握的排前面，同组内按录入时间倒序（最近录入的优先） */
+function gameChars(){
+  const arr = S.words.slice();
+  arr.sort(function(a, b){
+    if(!!a.mastered !== !!b.mastered) return a.mastered ? 1 : -1;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+  return arr.map(function(w){ return w.char; });
+}
+
+function renderGameChips(){
+  const box = $('gameChips');
+  if(!box) return;
+  box.innerHTML = '';
+  gameChars().forEach(function(ch){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'g-chip' + (ch === GAME.char ? ' on' : '') + (gameCacheGet(ch) ? ' cached' : '');
+    b.textContent = ch;
+    b.addEventListener('click', function(){ startGame(ch, false); });
+    box.appendChild(b);
+  });
+}
+
+/* 有 Key 且字库非空 → 显示游戏主体；否则显示引导 */
+function gameShowGuide(){
+  const ok = !!AI.key && S.words.length > 0;
+  const guide = $('gameGuide'), body = $('gameBody');
+  if(!guide || !body) return false;
+  if(ok){ guide.classList.add('hidden'); body.classList.remove('hidden'); return true; }
+  guide.classList.remove('hidden'); body.classList.add('hidden');
+  $('gameGuideTitle').textContent = !AI.key ? '先连接 AI，才能自动出题' : '字库里还没有生字';
+  $('gameGuideText').textContent = !AI.key
+    ? '填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个优美句子，把生字挖空，让你手写填字。'
+    : '先去「录入」添加几个生字，再回来玩填词游戏。';
+  $('gameGuideBtn1').classList.toggle('hidden', !!AI.key);
+  return false;
+}
+
+async function startGame(ch, force){
+  if(GAME.busy && GAME.pendingChar === ch) return;
+  GAME.char = ch;
+  renderGameChips();
+
+  let data = force ? null : gameCacheGet(ch);
+  if(!data){
+    GAME.busy = true;
+    GAME.pendingChar = ch;
+    renderGameLoading(ch);
+    try{
+      data = await aiGen(ch);
+      gameCacheSet(ch, data.idioms, data.sentences);
+      renderGameChips();
+    }catch(e){
+      GAME.busy = false; GAME.pendingChar = '';
+      renderGameError(ch, e);
+      return;
+    }
+    GAME.busy = false; GAME.pendingChar = '';
+    if(GAME.char !== ch) return;         // 等待期间用户已换别的字
+  }
+
+  GAME.items = [];
+  data.idioms.forEach(function(t){ GAME.items.push({ type: 'idiom', text: t }); });
+  data.sentences.forEach(function(t){ GAME.items.push({ type: 'sentence', text: t }); });
+  GAME.idx = 0;
+  GAME.states = GAME.items.map(function(){ return ''; });
+  GAME.hintOn = false;
+  renderGameQuest();
+}
+
+function renderGameLoading(ch){
+  $('gameQuest').innerHTML =
+    '<div class="gq-loading"><span class="gq-spin"></span>' +
+    '<span>正在请 AI 为「' + escHtml(ch) + '」出题：3 个成语 + 3 个句子…<br>第一次约需十几秒，之后这个字会缓存起来</span></div>';
+  resetGameInput();
+}
+
+function renderGameError(ch, e){
+  let msg = (e && e.message) || '生成失败';
+  if(e && e.status === 401) msg = 'API Key 无效，请检查 AI 设置';
+  else if(e && e.status === 402) msg = 'DeepSeek 账户余额不足';
+  else if(e && e.status === 429) msg = '调用太频繁，稍等几秒再试';
+  $('gameQuest').innerHTML =
+    '<div class="gq-loading">' +
+      '<svg class="ic" style="width:32px;height:32px;color:var(--red)"><use href="#i-x"/></svg>' +
+      '<span>「' + escHtml(ch) + '」出题失败：' + escHtml(msg) + '</span>' +
+      '<button class="btn btn-soft" id="gqRetry" type="button">重试</button>' +
+    '</div>';
+  const r = $('gqRetry');
+  if(r) r.addEventListener('click', function(){ startGame(ch, true); });
+}
+
+function renderGameIdle(){
+  GAME.char = ''; GAME.items = []; GAME.idx = 0; GAME.states = []; GAME.hintOn = false;
+  renderGameChips();
+  $('gameQuest').innerHTML =
+    '<div class="gq-loading">' +
+      '<svg class="ic" style="width:34px;height:34px;color:var(--game)"><use href="#i-game"/></svg>' +
+      '<span>点上面的生字开始 —— AI 会生成 3 个成语和 3 个句子，<br>把生字挖空，用手写板写对才算过关</span>' +
+    '</div>';
+  resetGameInput();
+  $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>先选一个生字</span>';
+}
+
+/* 把目标字挖空显示；答对变绿，看过提示变琥珀色 */
+function questHtml(item, state, ch){
+  const t = item.text;
+  const i = t.indexOf(ch);
+  if(i < 0) return escHtml(t);
+  const cls = state === 'ok' ? 'g-blank ok' : (GAME.hintOn ? 'g-blank hint' : 'g-blank');
+  const inner = (state === 'ok' || GAME.hintOn) ? ch : '?';
+  return escHtml(t.slice(0, i)) +
+    '<span class="' + cls + '">' + escHtml(inner) + '</span>' +
+    escHtml(t.slice(i + 1));
+}
+
+function renderGameQuest(){
+  const q = $('gameQuest');
+  if(!q || !GAME.items.length) return;
+  const item = GAME.items[GAME.idx];
+  const st = GAME.states[GAME.idx];
+  let dots = '';
+  GAME.states.forEach(function(s, k){
+    dots += '<i class="' + (s === 'ok' ? 'ok' : (k === GAME.idx ? 'cur' : '')) + '"></i>';
+  });
+  const py = pyOf(GAME.char);
+  q.innerHTML =
+    '<div class="gq-type">' + (item.type === 'idiom' ? '成语填空' : '句子填空') + '</div>' +
+    '<div class="gq-text' + (item.type === 'sentence' ? ' is-sent' : '') + '">' + questHtml(item, st, GAME.char) + '</div>' +
+    '<div class="gq-foot">' +
+      '<span class="gq-prog">' + dots + '</span>' +
+      '<span class="gq-count">第 ' + (GAME.idx + 1) + ' / ' + GAME.items.length + ' 题' +
+      (py ? ' · 这个字读「' + escHtml(py) + '」' : '') + '</span>' +
+    '</div>';
+  resetGameInput();
+  $('gameHint').innerHTML =
+    '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>在格子里写出去掉的「' + escHtml(GAME.char) + '」</span>';
+}
+
+function renderGameDone(){
+  const ok = GAME.states.filter(function(s){ return s === 'ok'; }).length;
+  const skip = GAME.states.filter(function(s){ return s === 'skip'; }).length;
+  $('gameQuest').innerHTML =
+    '<div class="gq-done">' +
+      '<svg class="ic"><use href="#i-award"/></svg>' +
+      '<h3>「' + escHtml(GAME.char) + '」过关！</h3>' +
+      '<p>写对 ' + ok + ' / ' + GAME.items.length + ' 题' + (skip ? ' · 跳过 ' + skip + ' 题' : '') + '</p>' +
+      '<div class="gq-foot" style="justify-content:center;margin-top:4px">' +
+        '<button class="btn btn-soft" id="gqAgain" type="button">重新出题再练</button>' +
+        '<button class="btn btn-primary" id="gqNext" type="button">换个生字</button>' +
+      '</div>' +
+    '</div>';
+  resetGameInput();
+  $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-check"/></svg><span>这一轮完成！</span>';
+  const a = $('gqAgain'), n = $('gqNext');
+  if(a) a.addEventListener('click', function(){ startGame(GAME.char, true); });
+  if(n) n.addEventListener('click', renderGameIdle);
+}
+
+/* ---------- 手写答题（复用手写识别引擎） ---------- */
+function resetGameInput(){
+  if(GAME.pad) GAME.pad.clear();
+  GAME.lastSig = null;
+  $('gameCands').innerHTML = '';
+}
+
+function gameInkChanged(){
+  clearTimeout(GAME.recTimer);
+  if(!GAME.char || GAME.idx >= GAME.items.length) return;
+  if(!GAME.pad || GAME.pad.isEmpty()){ GAME.lastSig = null; return; }
+  if(GAME.pad.pid !== null && GAME.pad.pid !== undefined) return;
+  if(inkSignature(GAME.pad) === GAME.lastSig) return;
+  GAME.recTimer = setTimeout(runGameRecognize, 900);
+}
+
+function runGameRecognize(){
+  if(!GAME.char || GAME.idx >= GAME.items.length) return;
+  if(!GAME.pad || GAME.pad.isEmpty()) return;
+  if(GAME.pad.pid !== null && GAME.pad.pid !== undefined) return;
+  if(inkSignature(GAME.pad) === GAME.lastSig) return;
+  const hint = $('gameHint');
+
+  const doRec = function(){
+    const sig = inkSignature(GAME.pad);
+    const finish = function(res){
+      if(!GAME.pad || inkSignature(GAME.pad) !== sig) return;   // 推理期间又动了笔，丢弃结果
+      GAME.lastSig = sig;
+      if(!res || !res.length){
+        hint.innerHTML = '<span>没认出来，写大一点、写清楚些</span>';
+        return;
+      }
+      const target = GAME.char;
+      let hit = false;
+      const box = $('gameCands');
+      box.innerHTML = '';
+      res.forEach(function(r){
+        if(r.ch === target) hit = true;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cand-chip' + (r.ch === target ? ' top' : '');
+        b.textContent = r.ch;
+        box.appendChild(b);
+      });
+      if(hit){
+        gameAnswerOk();
+      }else{
+        hint.innerHTML = '<span>写的是「' + escHtml(res[0].ch) + '」吗？要写的是「' + escHtml(target) + '」，再试一次</span>';
+      }
+    };
+    if(OcrHWR.isReady()){
+      OcrHWR.recognize(GAME.pad).then(function(res){
+        if(res && res.length) return finish(res);
+        finish(Recognizer.recognize(GAME.pad));
+      }).catch(function(){ finish(Recognizer.recognize(GAME.pad)); });
+    }else{
+      finish(Recognizer.recognize(GAME.pad));
+    }
+  };
+
+  if(!hwrReady()){
+    hint.innerHTML = '<span>正在准备识别引擎…</span>';
+    hwrEnsure(function(p){
+      hint.innerHTML = '<span>正在准备识别模型 ' + Math.round(p * 100) + '%…（首次使用需下载约 16MB）</span>';
+    }, function(ok){
+      if(!ok){ hint.innerHTML = '<span>识别引擎没准备好，稍后再试</span>'; return; }
+      setTimeout(runGameRecognize, 20);
+    });
+    return;
+  }
+  hint.innerHTML = '<span>正在识别…</span>';
+  setTimeout(doRec, 16);
+}
+
+function gameAnswerOk(){
+  GAME.states[GAME.idx] = 'ok';
+  renderGameQuest();                 // 空格里亮出正确答案（绿色），并清空手写板
+  $('gameHint').innerHTML =
+    '<svg class="ic ic-sm" style="color:var(--primary)"><use href="#i-check"/></svg><span>写对了！</span>';
+  setTimeout(function(){
+    if(GAME.states[GAME.idx] !== 'ok') return;      // 状态被重置就不动
+    if(GAME.idx >= GAME.items.length - 1){
+      renderGameDone();
+    }else{
+      GAME.idx++;
+      GAME.hintOn = false;
+      renderGameQuest();
+    }
+  }, 900);
+}
+
+function gameHintShow(){
+  if(!GAME.char || GAME.idx >= GAME.items.length) return;
+  GAME.hintOn = true;
+  renderGameQuest();
+  $('gameHint').innerHTML =
+    '<svg class="ic ic-sm" style="color:var(--amber)"><use href="#i-bulb"/></svg>' +
+    '<span>答案就是「' + escHtml(GAME.char) + '」· 看清楚再写一遍</span>';
+}
+
+function gameSkip(){
+  if(!GAME.char || GAME.idx >= GAME.items.length) return;
+  GAME.states[GAME.idx] = 'skip';
+  GAME.hintOn = true;                // 跳过也把答案亮出来，看一眼
+  renderGameQuest();
+  $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-right"/></svg><span>跳过这一题，看一眼答案</span>';
+  setTimeout(function(){
+    if(GAME.states[GAME.idx] !== 'skip') return;
+    if(GAME.idx >= GAME.items.length - 1){
+      renderGameDone();
+    }else{
+      GAME.idx++;
+      GAME.hintOn = false;
+      renderGameQuest();
+    }
+  }, 900);
+}
+
+/* ---------- AI 设置弹窗 ---------- */
+function openAiModal(){
+  refreshAiUI();
+  const k = $('aiKey');
+  if(k) k.value = '';
+  openModal('modalAi');
+}
+function refreshAiUI(){
+  const on = !!AI.key;
+  const t = $('aiStateTitle'), s = $('aiStateSub'), dot = $('aiDot');
+  if(t) t.textContent = on ? '已配置' : '未配置';
+  if(s) s.textContent = on
+    ? 'Key 已保存在本机，填词游戏随时可用'
+    : '填词游戏用 DeepSeek 生成成语和句子，需要一个 API Key';
+  if(dot){ dot.classList.toggle('ok', on); dot.classList.remove('err'); }
+}
+function aiSave(){
+  const k = ($('aiKey').value || '').trim();
+  if(!k){ toast('先粘贴 Key（sk- 开头）'); return; }
+  if(k.indexOf('sk-') !== 0 && k.length < 20){ toast('这看起来不像 DeepSeek Key，请检查'); return; }
+  AI.key = k;
+  saveAi();
+  refreshAiUI();
+  gameShowGuide();
+  renderGameChips();
+  toast('已保存，可以玩填词游戏了');
+}
+async function aiTest(){
+  const k = ($('aiKey').value || '').trim() || AI.key;
+  if(!k){ toast('先粘贴 Key'); return; }
+  const old = AI.key;
+  AI.key = k;
+  const btn = $('btnAiTest');
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = '测试中…';
+  try{
+    await deepseekChat('你是一台回声机。', '只输出 JSON：{"ok":true}');
+    toast('连接成功，AI 已就绪');
+    if(($('aiKey').value || '').trim()) aiSave();
+  }catch(e){
+    toast('连接失败：' + ((e && e.message) || '网络错误'));
+  }
+  AI.key = old;
+  saveAi();
+  btn.disabled = false;
+  btn.textContent = label;
+}
+function aiClear(){
+  AI.key = '';
+  saveAi();
+  refreshAiUI();
+  gameShowGuide();
+  toast('已清除 Key');
+}
+
+function bindGame(){
+  $('btnGameUndo').addEventListener('click', function(){
+    if(GAME.pad && !GAME.pad.undo()) toast('没有可以撤销的笔画');
+  });
+  $('btnGameClear').addEventListener('click', function(){
+    if(GAME.pad) GAME.pad.clear();
+    GAME.lastSig = null;
+    $('gameCands').innerHTML = '';
+  });
+  $('btnGameHint').addEventListener('click', gameHintShow);
+  $('btnGameSkip').addEventListener('click', gameSkip);
+  $('btnAiCfg').addEventListener('click', openAiModal);
+  $('gameGuideBtn1').addEventListener('click', openAiModal);
+  $('btnAiSave').addEventListener('click', aiSave);
+  $('btnAiTest').addEventListener('click', function(){ aiTest(); });
+  $('btnAiClear').addEventListener('click', aiClear);
+}
+
+/* ============================================================
    10.5 云同步（GitHub Gist，纯前端直连，零成本）
-   —— 说明：网页无法后台定时，所以只在「数据改动后」和「打开 App 时」两个时机同步
+   —— 发布：数据改动后自动上传；订阅：App 打开期间每 20 秒探测云端，
+      其他设备的改动自动同步过来（cloudSubTick）
    ============================================================ */
 const CLOUD_KEY  = 'hanzi.cloud.v1';     // { token, gistId, auto, lastSync }
 const META_KEY   = 'hanzi.meta.v1';      // { updatedAt } 本地最后改动时间
@@ -12155,7 +12632,7 @@ function switchTab(tab, focusChar){
   if(tab !== 'library' && S.selMode){ S.selMode = false; S.sel.clear(); syncSelUI(); }
   S.tab = tab;
 
-  ['review','entry','library'].forEach(function(t){
+  ['review','entry','library','game'].forEach(function(t){
     const v = $('view-' + t);
     if(!v) return;
     const on = (t === tab);
@@ -12193,6 +12670,15 @@ function switchTab(tab, focusChar){
 
   if(tab === 'library'){
     renderLib();
+  }
+
+  if(tab === 'game'){
+    setTimeout(function(){
+      initGamePad();
+      if(GAME.pad) GAME.pad.resize();
+      renderGameChips();
+      if(gameShowGuide() && !GAME.items.length) renderGameIdle();
+    }, 60);
   }
 
   window.scrollTo({ top:0, behavior:'auto' });
@@ -12711,9 +13197,11 @@ function boot(){
   loadStore();
   loadEngineMode();
   loadCloud();
+  loadAi();
   updateCounts();
   initPad();
   bind();
+  bindGame();
   setLibFilter('learning');
   switchTab('review');
   loadOptionalScripts();
@@ -12725,6 +13213,9 @@ function boot(){
 
   // 打开时比对一次云端备份（云端更新就弹窗问，不自动覆盖本地）
   setTimeout(cloudCheckOnOpen, 2200);
+
+  // pub/sub 订阅：App 打开期间每 20 秒探测云端，其他设备的改动自动同步过来
+  startCloudSub();
 
   // 空闲时预装载手写识别数据（一次性约 200ms），第一次手写识别就不用等
   setTimeout(function(){
@@ -12764,17 +13255,19 @@ function boot(){
   window.addEventListener('resize', function(){
     if(pad) setTimeout(function(){ pad.resize(); }, 80);
     if(entryPad) setTimeout(function(){ entryPad.resize(); }, 90);
+    if(GAME.pad) setTimeout(function(){ GAME.pad.resize(); }, 100);
     rebuildQuiz();
   });
   window.addEventListener('orientationchange', function(){
-    setTimeout(function(){ if(pad) pad.resize(); if(entryPad) entryPad.resize(); rebuildQuiz(); }, 320);
+    setTimeout(function(){ if(pad) pad.resize(); if(entryPad) entryPad.resize(); if(GAME.pad) GAME.pad.resize(); rebuildQuiz(); }, 320);
   });
 
-  // 切回前台时刷新尺寸（iPad 分屏 / 旋转），并补一次健康探测
+  // 切回前台时刷新尺寸（iPad 分屏 / 旋转），并补一次健康探测 + 立刻订阅探测一次云端
   document.addEventListener('visibilitychange', function(){
     if(document.hidden){ if(CLOUD.queued) cloudSyncSoon(0); return; }
     if(cloudOn() && CLOUD.auto && localAt() > (CLOUD.remoteAt || CLOUD.lastSync)) cloudSyncSoon(0);
-    setTimeout(function(){ if(pad) pad.resize(); if(entryPad) entryPad.resize(); }, 120);
+    setTimeout(cloudSubTick, 800);
+    setTimeout(function(){ if(pad) pad.resize(); if(entryPad) entryPad.resize(); if(GAME.pad) GAME.pad.resize(); }, 120);
     if(ENG.mode !== 'local' && !ENG.healthy && Date.now() >= ENG.retryAt) probeStrict();
   });
 }
