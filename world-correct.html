@@ -2538,7 +2538,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
       <span class="io-ico cloud-ico"><svg class="ic"><use href="#i-cloud"/></svg></span>
       <span class="io-txt">
         <b id="cloudTitle">云同步（可选）</b>
-        <em id="cloudSub">连上 GitHub 后，每次改动都会自动备份到你的私有 Gist</em>
+        <em id="cloudSub">连上 GitHub 后，改动自动备份到私有 Gist，多台设备自动保持同步</em>
       </span>
       <svg class="ic io-arrow"><use href="#i-right"/></svg>
     </button>
@@ -2589,7 +2589,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
       <span class="cs-dot" id="cloudDot"></span>
       <span class="cs-txt">
         <b id="cloudStateTitle">未连接</b>
-        <em id="cloudStateSub">连上后，每次改动会自动备份到你的私有 Gist</em>
+        <em id="cloudStateSub">连上后，改动自动备份，多台设备自动保持同步</em>
       </span>
     </div>
 
@@ -11875,7 +11875,7 @@ function refreshCloudUI(){
   if(ss){
     ss.textContent = on
       ? (CLOUD.lastErr ? CLOUD.lastErr : ('上次备份 ' + agoText(CLOUD.lastSync) + ' · 本机 ' + S.words.length + ' 个字'))
-      : '连上后，每次改动会自动备份到你的私有 Gist';
+      : '连上后，改动自动备份，多台设备自动保持同步';
   }
 
   $('cloudSetup').hidden = on;
@@ -11884,7 +11884,8 @@ function refreshCloudUI(){
   const stats = $('cloudStats');
   if(stats && on){
     stats.innerHTML = '本机 <b>' + S.words.length + '</b> 个字 · 上次备份 <b>' + agoText(CLOUD.lastSync) + '</b>' +
-      '<br>云端文件：Gist ' + String(CLOUD.gistId).slice(0, 8) + '…（可在 GitHub 的 Gist 列表里看到历史版本）';
+      '<br>云端文件：Gist ' + String(CLOUD.gistId).slice(0, 8) + '…（可在 GitHub 的 Gist 列表里看到历史版本）' +
+      '<br>实时订阅：' + (CLOUD.auto ? '其他设备的改动约 20 秒内自动同步过来' : '已关闭（开启后多设备自动保持一致）');
   }
   const auto = $('cloudAuto');
   if(auto) auto.checked = !!CLOUD.auto;
