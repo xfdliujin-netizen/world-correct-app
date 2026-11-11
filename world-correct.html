@@ -2055,6 +2055,71 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
         </div>
       </section>
 
+      <!-- ============ 2.5 填词游戏 ============ -->
+      <section id="view-game" class="view hidden">
+        <div class="card game-card">
+
+          <div class="game-head">
+            <span class="game-head-mark"></span>
+            <strong>填词游戏</strong>
+            <span class="game-head-sub">AI 出题 · 挖空填字 · 练字又长知识</span>
+            <button class="chip" id="btnAiCfg" type="button">
+              <svg class="ic"><use href="#i-gear"/></svg><span>AI 设置</span>
+            </button>
+          </div>
+
+          <!-- 引导态：没配 Key / 字库为空 -->
+          <div id="gameGuide" class="game-guide hidden">
+            <div class="big-ic"><svg class="ic"><use href="#i-game"/></svg></div>
+            <h2 id="gameGuideTitle">先连接 AI，才能自动出题</h2>
+            <p id="gameGuideText">填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个句子，把生字挖空，让你手写填字。</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px">
+              <button class="btn btn-primary" id="gameGuideBtn1">配置 DeepSeek</button>
+              <button class="btn btn-soft" data-goto="entry">去录入生字</button>
+            </div>
+          </div>
+
+          <!-- 游戏主体 -->
+          <div id="gameBody" class="game-body hidden">
+            <div class="game-grid">
+
+              <div class="game-quest-col">
+                <div class="game-pick">
+                  <div class="game-pick-label">选一个生字，让 AI 出题</div>
+                  <div class="game-chips" id="gameChips"></div>
+                </div>
+
+                <div class="game-quest" id="gameQuest"></div>
+              </div>
+
+              <div class="game-write-col">
+                <div class="tian-wrap">
+                  <div class="tian game-tian" id="gameTian">
+                    <canvas id="gamePadCanvas"></canvas>
+                  </div>
+                </div>
+                <div class="pad-hint" id="gameHint">
+                  <svg class="ic ic-sm"><use href="#i-pen"/></svg>
+                  <span>先选一个生字</span>
+                </div>
+                <div class="cands" id="gameCands"></div>
+                <div class="game-tools">
+                  <button class="mini" id="btnGameUndo" type="button">
+                    <svg class="ic"><use href="#i-undo"/></svg>撤销
+                  </button>
+                  <button class="mini" id="btnGameClear" type="button">清空</button>
+                  <button class="mini" id="btnGameHint" type="button">
+                    <svg class="ic"><use href="#i-bulb"/></svg>提示
+                  </button>
+                  <button class="mini" id="btnGameSkip" type="button">跳过</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ============ 3. 我的字库 ============ -->
       <section id="view-library" class="view hidden">
         <div class="lib-bar">
@@ -2451,6 +2516,49 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
       <button class="btn btn-primary" id="btnPullUseCloud" type="button">用云端的覆盖本地</button>
       <button class="btn btn-ghost" id="btnPullKeepLocal" type="button">保留本地并上传</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ 弹窗：AI 出题设置 ============ -->
+<div class="modal" id="modalAi">
+  <div class="backdrop" data-close></div>
+  <div class="panel">
+    <div class="panel-head">
+      <h3>AI 出题设置</h3>
+      <button class="close" data-close><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+
+    <div class="cloud-state">
+      <span class="cs-dot" id="aiDot"></span>
+      <span class="cs-txt">
+        <b id="aiStateTitle">未配置</b>
+        <em id="aiStateSub">填词游戏用 DeepSeek 生成成语和句子，需要一个 API Key</em>
+      </span>
+    </div>
+
+    <div class="field" style="margin-top:14px">
+      <label for="aiKey">DeepSeek API Key</label>
+      <input class="input" id="aiKey" type="password" spellcheck="false"
+             autocomplete="off" autocapitalize="off" autocorrect="off"
+             placeholder="sk- 开头的那一串" />
+      <div class="vf-note">Key 只存在这台设备上，不会写进网页文件，可随时在这里清除或去后台删除。</div>
+    </div>
+
+    <details class="cloud-how">
+      <summary>怎么拿到 Key？（一次性，约 1 分钟）</summary>
+      <ol>
+        <li>电脑或手机打开 <b>platform.deepseek.com</b>，注册 / 登录</li>
+        <li>左侧 <b>API Keys</b> → <b>Create new key</b>，起个名字（如「错字本」）</li>
+        <li>复制生成的一串（<b>sk-</b> 开头，只显示一次），粘到上面</li>
+        <li>DeepSeek 按用量计费，出一次题消耗很少（几厘钱）；Key 可随时在 DeepSeek 后台删除</li>
+      </ol>
+    </details>
+
+    <div class="row-2" style="margin-top:12px">
+      <button class="btn btn-primary" id="btnAiSave" type="button" style="flex:1">保存</button>
+      <button class="btn btn-ghost" id="btnAiTest" type="button" style="flex:1">测试连接</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="btnAiClear" type="button" style="width:100%;margin-top:10px">清除 Key</button>
   </div>
 </div>
 
