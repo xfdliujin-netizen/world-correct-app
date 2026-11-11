@@ -228,7 +228,7 @@ button{
 /* --- 底部标签栏（竖屏） --- */
 .tabbar{
   position:fixed;left:0;right:0;bottom:0;z-index:40;
-  display:grid;grid-template-columns:repeat(3,1fr);gap:4px;
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;
   padding:7px 10px calc(7px + env(safe-area-inset-bottom));
   background:var(--tab-bg);
   -webkit-backdrop-filter:saturate(180%) blur(20px);
@@ -237,7 +237,7 @@ button{
 }
 .tab{
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  min-height:50px;border-radius:14px;
+  min-width:0;white-space:nowrap;min-height:50px;border-radius:14px;
   font-size:11px;font-weight:600;color:var(--muted);
   transition:color .18s ease,background .18s ease;
   position:relative;
@@ -1869,6 +1869,10 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 }
 
 #view-game .game-quest{overflow-y:auto;}
+
+.tag-learning{background:var(--primary-l);color:var(--primary);}
+.gq-pinyin{font-size:24px;color:var(--primary);font-weight:700;text-align:center;padding:10px;}
+.game-score{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-2);}
 </style>
 </head>
 
@@ -2194,6 +2198,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
               <div class="field">
                 <div class="field-head">
                   <label for="entrySentence">记忆例句 <span class="desc">（最多 3 句）</span></label>
+                  <button class="sent-add" id="btnEntryAi" type="button">AI 造句</button><button class="sent-add" id="btnEntryAiConfig" type="button">AI 设置</button>
                   <button class="sent-add hidden" id="btnAddSentence" type="button">＋ 再加一句</button>
                 </div>
                 <textarea id="entrySentence" class="textarea" rows="1"
@@ -2230,7 +2235,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
           <div id="gameGuide" class="game-guide hidden">
             <div class="big-ic"><svg class="ic"><use href="#i-game"/></svg></div>
             <h2 id="gameGuideTitle">先连接 AI，才能自动出题</h2>
-            <p id="gameGuideText">填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个词语、3 个成语和 3 个句子，把生字挖空，让你手写填字。</p>
+            <p id="gameGuideText">填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个句子，根据拼音补全空格，挑战成语和佳句。</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px">
               <button class="btn btn-primary" id="gameGuideBtn1">配置 DeepSeek</button>
               <button class="btn btn-soft" data-goto="entry">去录入生字</button>
@@ -2242,11 +2247,6 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
             <div class="game-grid">
 
               <div class="game-quest-col">
-                <div class="game-pick">
-                  <div class="game-pick-label">选一个生字，让 AI 出题</div>
-                  <div class="game-chips" id="gameChips"></div>
-                </div>
-
                 <div class="game-quest" id="gameQuest"></div>
               </div>
 
@@ -2258,7 +2258,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
                 </div>
                 <div class="pad-hint" id="gameHint">
                   <svg class="ic ic-sm"><use href="#i-pen"/></svg>
-                  <span>先选一个生字</span>
+                  <span>看拼音，补全成语和佳句</span>
                 </div>
                 <div class="cands" id="gameCands"></div>
                 <div class="game-tools">
@@ -8570,25 +8570,14 @@ function pickSentence(ch, payload){
   return out;
 }
 
-function fetchSentenceFor(ch, words){
-  const queries = [];
-  if(words && words[0]) queries.push(words[0]);
-  if(words && words[1] && words[1] !== words[0]) queries.push(words[1]);
-  queries.push(ch);
-
-  const got = {}, out = [];
-  const next = function(idx){
-    if(idx >= queries.length || out.length >= 3) return Promise.resolve(out);
-    const url = 'https://api.tatoeba.org/unstable/sentences?lang=cmn&sort=relevance&limit=25&q=' +
-      encodeURIComponent(queries[idx]);
-    return fetchJson(url, 4500).then(function(j){
-      (pickSentence(ch, j) || []).forEach(function(s){
-        if(!got[s]){ got[s] = 1; out.push(s); }
-      });
-      return next(idx + 1);
-    }).catch(function(){ return next(idx + 1); });
-  };
-  return next(0);
+async function fetchSentenceFor(ch, words){
+  if(!AI.key)throw new Error('请先配置 DeepSeek Key，再生成例句');
+  const text=await deepseekChat('你是一位小学语文老师，擅长写适合孩子阅读与硬笔书法练习的优美例句。只返回严格 JSON。',
+    '为生字「'+ch+'」生成 3 个不同的句子，可参考组词：'+(words||[]).join('、')+'。每句必须完整包含「'+ch+'」，句意优美、积极向上，带有画面感，兼具科普或文学色彩，避免干巴巴的口号。每句 15～30 个汉字，适合硬笔书法练习。只返回 JSON：{"sentences":["句子一","句子二","句子三"]}');
+  const j=parseAiJson(text);
+  const sentences=j && Array.isArray(j.sentences)?Array.from(new Set(j.sentences.filter(t=>typeof t==='string').map(t=>t.trim()))).filter(t=>t.includes(ch) && t.replace(/[^\u3400-\u9fff]/g,'').length>=15 && t.replace(/[^\u3400-\u9fff]/g,'').length<=30):[];
+  if(sentences.length!==3)throw new Error('AI 例句未达要求，请点击 AI 造句重试');
+  return sentences;
 }
 
 function mergeWords(a, b){
@@ -8623,10 +8612,11 @@ function enrichEntry(ch, autoWords, autoSentence, seq){
 
   if(!needWords && !needSentence){ setEntryNet(''); return; }
 
-  setEntryNet(needSentence ? '正在联网获取例句…' : '正在联网补全组词…', false);
+  setEntryNet(needSentence ? 'DeepSeek 正在生成优美例句…' : '正在联网补全组词…', false);
 
   const wordsTask = needWords ? fetchRemoteWords(ch) : Promise.resolve([]);
-  const sentTask = needSentence ? fetchSentenceFor(ch, autoWords) : Promise.resolve([]);
+  let sentenceError='';
+  const sentTask = needSentence ? fetchSentenceFor(ch, autoWords).catch(e=>{sentenceError=e.message;return [];}) : Promise.resolve([]);
 
   Promise.all([wordsTask, sentTask]).then(function(r){
     if(seq !== entryFetchSeq || S.entryChar !== ch) return;
@@ -8656,8 +8646,9 @@ function enrichEntry(ch, autoWords, autoSentence, seq){
 
     if(merged.length || remoteSents.length) setLexCache(ch, merged, remoteSents[0] || '');
 
-    if(changed){
-      setEntryNet('已联网补全，可自行修改', true);
+    if(sentenceError){setEntryNet(sentenceError,false);}
+    else if(changed){
+      setEntryNet('已通过 DeepSeek 生成例句，可自行修改', true);
       onWordsInput();
     }else if(!remoteWords.length && !remoteSents.length){
       setEntryNet('联网暂时取不到，可直接保存，组词以后再补', true);
@@ -10516,12 +10507,12 @@ function onCharInput(){
   else if(lex) words = lex.words.slice();
   else if(cache && cache.words) words = cache.words.slice();
 
-  let sentence = (d && d.sentence) || (lex && lex.sentence) || (cache && cache.sentence) || '';
+  let sentence = ''; // New entry examples come from DeepSeek.
 
   $('entryWords').value = words.join('，');
   $('entrySentence').value = sentence;
   // 第二、三句：本地数据有多句时一起带出，否则留空待联网补
-  const more = (d && d.sentences) || (lex && lex.sentences) || (cache && cache.sentences) || [];
+  const more = [];
   $('entrySentence2').value = more[1] || '';
   $('entrySentence3').value = more[2] || '';
   syncSentInputs();
@@ -10598,8 +10589,7 @@ function saveEntry(){
   // 例句最多 3 句，第一句为空时用默认句兜底
   const sentences = [$('entrySentence'), $('entrySentence2'), $('entrySentence3')]
     .map(function(t){ return (t.value || '').trim(); }).filter(Boolean).slice(0, 3);
-  const sentence = sentences[0] || ('认真记住「' + ch + '」字的写法。');
-  if(!sentences.length) sentences.push(sentence);
+  const sentence = sentences[0] || '';
 
   let idx = -1;
   for(let i = 0; i < S.words.length; i++){ if(S.words[i].char === ch){ idx = i; break; } }
@@ -11288,7 +11278,7 @@ function renderLib(){
     // 掌握度三个点竖排，挂在页码正下方；已掌握则左上角小标签
     const status = w.mastered
       ? '<span class="tag-done lc-tag">已掌握</span>'
-      : '<span class="lc-side"><span class="dots lc-dots-v">' + dotsHTML(w.count) + '</span></span>';
+      : '<span class="tag-done lc-tag tag-learning">待复习</span><span class="lc-side"><span class="dots lc-dots-v">' + dotsHTML(w.count) + '</span></span>';
     return '<button class="lib-card' + (on ? ' sel' : '') + (page ? ' has-page' : '') + '" data-detail="' + w.char + '">' +
       (S.selMode
         ? '<span class="lc-check"><svg class="ic"><use href="#i-check"/></svg></span>'
@@ -11547,7 +11537,7 @@ function restore(){
 
 /* ============================================================
    10.4 填词游戏（AI 出题 · 挖空填字）
-   —— 根据录入的生字，用 DeepSeek 生成 3 个词语 + 3 个成语 + 3 个句子，
+   —— 根据录入的生字，用 DeepSeek 生成 3 个成语 + 3 个句子，
       把生字挖空，手写填对才算过关；题目按字缓存在本机，不重复花钱。
    ============================================================ */
 const AI_STORE  = 'hanzi.ai.v1';      // { key } —— DeepSeek API Key，只存本机
@@ -11579,9 +11569,7 @@ function gameCacheGet(ch){
   const i = (c.i || []).filter(function(s){ return typeof s === 'string' && s.indexOf(ch) >= 0; });
   const s = (c.s || []).filter(function(t){ return typeof t === 'string' && t.indexOf(ch) >= 0; });
   if(i.length !== 3 || s.length !== 3 || new Set(i).size !== 3 || new Set(s).size !== 3) return null;
-  const words=(c.w||[]).filter(t=>typeof t==='string' && t.includes(ch) && t.length>=2 && t.length<=4);
-  if(words.length!==3) return null;
-  return { words, idioms: i, sentences: s };
+  return { idioms: i, sentences: s };
 }
 function gameCacheSet(ch, idioms, sentences, words){
   const all = gameCacheAll();
@@ -11634,7 +11622,6 @@ async function aiGenFor(ch, retry){
   const sys = '你是一位资深语文老师，为小学生设计硬笔书法练习素材。你的回答永远是一个严格的 JSON 对象，不含任何其他文字。';
   const user =
     '请为生字「' + ch + '」生成练习素材：\n' +
-    '0. 3 个包含「' + ch + '」字的常用词语（2～4 字）；\n' +
     '1. 3 个包含「' + ch + '」字的成语；\n' +
     '2. 3 个包含「' + ch + '」字的句子。\n' +
     '要求：\n' +
@@ -11642,26 +11629,25 @@ async function aiGenFor(ch, retry){
     '- 句意优美、积极向上，带有画面感，兼具科普或文学色彩（避免干巴巴的口号）；\n' +
     '- 句子长度适中（15～30 字），适合作为硬笔书法练习的范本；\n' +
     '- 成语选常见、用法规范的，不要生造。\n' +
-    '只输出 JSON：{"words":["","",""],"idioms":["","",""],"sentences":["","",""]}';
+    '只输出 JSON：{"idioms":["","",""],"sentences":["","",""]}';
   const txt = await deepseekChat(sys, retry
     ? '注意：上一次的结果里有不包含「' + ch + '」字的条目，请严格自查每一项都必须完整包含「' + ch + '」这个字。\n' + user
     : user);
   const j = parseAiJson(txt);
-  if(!j || !Array.isArray(j.words) || !Array.isArray(j.idioms) || !Array.isArray(j.sentences)) throw new Error('AI 返回的格式不对');
+  if(!j || !Array.isArray(j.idioms) || !Array.isArray(j.sentences)) throw new Error('AI 返回的格式不对');
   const idioms = Array.from(new Set(j.idioms.filter(s=>typeof s==='string').map(s=>s.trim())))
     .filter(function(s){ return s.indexOf(ch) >= 0 && s.length === 4; });
   const sentences = Array.from(new Set(j.sentences.filter(s=>typeof s==='string').map(s=>s.trim())))
     .filter(function(s){ return s.indexOf(ch) >= 0 && s.replace(/[^\u3400-\u9fff]/g,'').length >= 15 && s.replace(/[^\u3400-\u9fff]/g,'').length <= 30; });
-  const words=Array.from(new Set(j.words.filter(t=>typeof t==='string').map(t=>t.trim()))).filter(t=>t.includes(ch) && t.length>=2 && t.length<=4).slice(0,3);
-  return { words, idioms: idioms.slice(0, 3), sentences: sentences.slice(0, 3) };
+  return { idioms: idioms.slice(0, 3), sentences: sentences.slice(0, 3) };
 }
 
 async function aiGen(ch){
   let r = await aiGenFor(ch, false);
-  if(r.words.length !== 3 || r.idioms.length !== 3 || r.sentences.length !== 3){
+  if(r.idioms.length !== 3 || r.sentences.length !== 3){
     r = await aiGenFor(ch, true);      // 有不达标条目 → 提醒模型自查重试一次
   }
-  if(r.words.length !== 3 || r.idioms.length !== 3 || r.sentences.length !== 3) throw new Error('未能生成 3 个规范成语和 3 个合格句子。该字可能没有足够的常见成语，请换字或重试；不会用生造成语凑数。');
+  if(r.idioms.length !== 3 || r.sentences.length !== 3) throw new Error('未能生成 3 个规范成语和 3 个合格句子。该字可能没有足够的常见成语，请换字或重试；不会用生造成语凑数。');
   return r;
 }
 
@@ -11684,20 +11670,15 @@ function gameChars(){
   return arr.map(function(w){ return w.char; });
 }
 
-function renderGameChips(){
-  const box = $('gameChips');
-  if(!box) return;
-  box.innerHTML = '';
-  gameChars().forEach(function(ch){
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'g-chip' + (ch === GAME.char ? ' on' : '') + (gameCacheGet(ch) ? ' cached' : '');
-    b.textContent = ch;
-    b.addEventListener('click', function(){ startGame(ch, false); });
-    box.appendChild(b);
-  });
+function renderGameChips(){} // No character picker: the app selects practice material.
+function gameStartRound(force){
+  if(!gameShowGuide() || GAME.busy)return;
+  const chars=gameChars();
+  const candidates=chars.filter(ch=>ch!==GAME.char);
+  const pool=candidates.length?candidates:chars;
+  const ch=pool[Math.floor(Math.random()*pool.length)];
+  if(ch)startGame(ch,!!force);
 }
-
 /* 有 Key 且字库非空 → 显示游戏主体；否则显示引导 */
 function gameShowGuide(){
   const ok = !!AI.key && S.words.length > 0;
@@ -11707,7 +11688,7 @@ function gameShowGuide(){
   guide.classList.remove('hidden'); body.classList.add('hidden');
   $('gameGuideTitle').textContent = !AI.key ? '先连接 AI，才能自动出题' : '字库里还没有生字';
   $('gameGuideText').textContent = !AI.key
-    ? '填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个词语、3 个成语和 3 个优美句子，把生字挖空，让你手写填字。'
+    ? '填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个优美句子，把生字挖空，让你手写填字。'
     : '先去「录入」添加几个生字，再回来玩填词游戏。';
   $('gameGuideBtn1').classList.toggle('hidden', !!AI.key);
   return false;
@@ -11737,9 +11718,9 @@ async function startGame(ch, force){
   }
 
   GAME.items = [];
-  data.words.forEach(function(t){ GAME.items.push({type:'word',text:t}); });
   data.idioms.forEach(function(t){ GAME.items.push({ type: 'idiom', text: t }); });
   data.sentences.forEach(function(t){ GAME.items.push({ type: 'sentence', text: t }); });
+  GAME.items.sort(()=>Math.random()-.5);
   GAME.idx = 0;
   GAME.states = GAME.items.map(function(){ return ''; });
   GAME.hintOn = false;
@@ -11749,7 +11730,7 @@ async function startGame(ch, force){
 function renderGameLoading(ch){
   $('gameQuest').innerHTML =
     '<div class="gq-loading"><span class="gq-spin"></span>' +
-    '<span>正在请 AI 为「' + escHtml(ch) + '」出题：3 个词语 + 3 个成语 + 3 个句子…<br>第一次约需十几秒，之后这个字会缓存起来</span></div>';
+    '<span>正在请 AI 为「' + escHtml(ch) + '」出题：3 个成语 + 3 个句子…<br>第一次约需十几秒，之后这个字会缓存起来</span></div>';
   resetGameInput();
 }
 
@@ -11769,15 +11750,8 @@ function renderGameError(ch, e){
 }
 
 function renderGameIdle(){
-  GAME.char = ''; GAME.items = []; GAME.idx = 0; GAME.states = []; GAME.hintOn = false;
-  renderGameChips();
-  $('gameQuest').innerHTML =
-    '<div class="gq-loading">' +
-      '<svg class="ic" style="width:34px;height:34px;color:var(--game)"><use href="#i-game"/></svg>' +
-      '<span>点上面的生字开始 —— AI 会生成 3 个词语、3 个成语和 3 个句子，<br>把生字挖空，用手写板写对才算过关</span>' +
-    '</div>';
-  resetGameInput();
-  $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>先选一个生字</span>';
+  GAME.items=[];GAME.idx=0;GAME.states=[];GAME.hintOn=false;
+  gameStartRound(false);
 }
 
 /* 把目标字挖空显示；答对变绿，看过提示变琥珀色 */
@@ -11799,17 +11773,19 @@ function renderGameQuest(){
   const w = S.words.filter(function(x){ return x.char === GAME.char; })[0];
   const py = (w && w.pinyin) || pyOf(GAME.char, (w && w.words) || []);
   q.innerHTML =
-    '<div class="gq-type">' + (item.type === 'word' ? '词语填空' : item.type === 'idiom' ? '成语填空' : '佳句填空') + '</div>' +
+    '<div class="game-score"><span>⭐ 已点亮 ' + GAME.states.filter(s=>s==='ok').length + ' / 6 颗星</span><span>读拼音 · 补空格</span></div>' +
+    '<div class="gq-type">' + (item.type === 'idiom' ? '成语挑战' : '佳句挑战') + '</div>' +
+    '<div class="gq-pinyin">' + escHtml(py || '试试根据上下文填写') + '</div>' +
     '<div class="gq-text' + (item.type === 'sentence' ? ' is-sent' : '') + '">' + questHtml(item, st, GAME.char) + '</div>' +
     '<div class="gq-foot">' +
       '<span class="gq-prog">' + dots + '</span>' +
       '<span class="gq-count">第 ' + (GAME.idx + 1) + ' / ' + GAME.items.length + ' 题' +
-      (py ? ' · 这个字读「' + escHtml(py) + '」' : '') + '</span>' +
+      '' + '</span>' +
     '</div>';
   if(st !== 'ok' && st !== 'skip'){
     const form=document.createElement('form');form.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
     form.innerHTML='<input aria-label="填写空缺的生字" class="input" maxlength="1" placeholder="填入生字" style="width:110px;min-height:44px"><button class="btn btn-primary" type="submit">检查答案</button>';
-    form.onsubmit=function(e){e.preventDefault();if(form.querySelector('input').value.trim()===GAME.char)gameAnswerOk();else toast('再读一遍，想想空格里该填哪个字');};q.appendChild(form);
+    form.onsubmit=function(e){e.preventDefault();if(form.querySelector('input').value.trim()===GAME.char)gameAnswerOk();else toast('💡 再看一眼拼音，你一定能想起来！');};q.appendChild(form);
   }else{
     const next=document.createElement('button');next.className='btn btn-primary';next.textContent='读一读，下一题';next.onclick=gameNext;q.appendChild(next);
   }
@@ -11829,13 +11805,13 @@ function renderGameDone(){
       '<div style="text-align:left;line-height:1.8"><b>好词好句积累 · 再读一遍</b>' + GAME.items.map(function(item){return '<p>'+escHtml(item.text)+'</p>';}).join('') + '</div>' +
       '<div class="gq-foot" style="justify-content:center;margin-top:4px">' +
         '<button class="btn btn-soft" id="gqAgain" type="button">重新出题再练</button>' +
-        '<button class="btn btn-primary" id="gqNext" type="button">换个生字</button>' +
+        '<button class="btn btn-primary" id="gqNext" type="button">再挑战一轮</button>' +
       '</div>' +
     '</div>';
   resetGameInput();
   $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-check"/></svg><span>这一轮完成！</span>';
   const a = $('gqAgain'), n = $('gqNext');
-  if(a) a.addEventListener('click', function(){ startGame(GAME.char, true); });
+  if(a) a.addEventListener('click', function(){ gameStartRound(true); });
   if(n) n.addEventListener('click', renderGameIdle);
 }
 
@@ -11848,7 +11824,7 @@ function resetGameInput(){
 
 function gameInkChanged(){
   clearTimeout(GAME.recTimer);
-  if(!GAME.char || GAME.idx >= GAME.items.length) return;
+  if(!GAME.char || GAME.idx >= GAME.items.length || GAME.states[GAME.idx]) return;
   if(!GAME.pad || GAME.pad.isEmpty()){ GAME.lastSig = null; return; }
   if(GAME.pad.pid !== null && GAME.pad.pid !== undefined) return;
   if(inkSignature(GAME.pad) === GAME.lastSig) return;
@@ -11915,10 +11891,11 @@ function runGameRecognize(){
 }
 
 function gameAnswerOk(){
+  if(GAME.states[GAME.idx])return;
   GAME.states[GAME.idx] = 'ok';
   renderGameQuest();                 // 空格里亮出正确答案（绿色），并清空手写板
   $('gameHint').innerHTML =
-    '<svg class="ic ic-sm" style="color:var(--primary)"><use href="#i-check"/></svg><span>写对了！</span>';
+    '<svg class="ic ic-sm" style="color:var(--primary)"><use href="#i-check"/></svg><span>⭐ 答对了！点亮一颗星，把完整内容读一遍吧！</span>';
 }
 function gameNext(){
   if(GAME.idx>=GAME.items.length-1){renderGameDone();return;}
@@ -11967,7 +11944,8 @@ function aiSave(){
   refreshAiUI();
   gameShowGuide();
   renderGameChips();
-  toast('已保存，可以玩填词游戏了');
+  if(S.tab==='game' && !GAME.items.length)gameStartRound(false);
+  toast('已保存，可以开始拼音挑战和 AI 造句');
 }
 async function aiTest(){
   const k = ($('aiKey').value || '').trim() || AI.key;
@@ -11999,6 +11977,21 @@ function aiClear(){
 }
 
 function bindGame(){
+  $('btnEntryAiConfig').onclick=openAiModal;
+  $('btnEntryAi').onclick=async function(){
+    const ch=S.entryChar;if(!ch){toast('请先录入一个生字');return;}
+    if(!AI.key){openAiModal();return;}
+    const seq=entryFetchSeq;
+    const boxes=[$('entrySentence'),$('entrySentence2'),$('entrySentence3')];
+    const before=boxes.map(b=>b.value);
+    this.disabled=true;setEntryNet('DeepSeek 正在生成例句…',false);
+    try{const sentences=await fetchSentenceFor(ch,($('entryWords').value||'').split(/[，、,\s]+/));
+      if(seq!==entryFetchSeq || S.entryChar!==ch)return;
+      boxes.forEach((b,i)=>{if(b.value===before[i])b.value=sentences[i];});syncSentInputs();setEntryNet('AI 例句已生成，可自行修改',true);
+    }catch(e){if(seq===entryFetchSeq)setEntryNet(e.message||'生成失败，请重试',false);}
+    finally{this.disabled=false;}
+  };
+
   $('btnGameUndo').addEventListener('click', function(){
     if(GAME.pad && !GAME.pad.undo()) toast('没有可以撤销的笔画');
   });
