@@ -1,5 +1,0 @@
-{
-  "name": "world-correct", "private": true,
-  "scripts": { "start": "node sync-server.cjs", "test": "node verify-project.cjs && node verify-sync.cjs" },
-  "dependencies": { "ws": "^8.18.3" }
-}
