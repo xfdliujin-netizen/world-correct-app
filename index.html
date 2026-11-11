@@ -804,6 +804,116 @@ button{
   0%,100%{opacity:.3;transform:scale(.85);}
   50%{opacity:1;transform:scale(1);}
 }
+
+/* ============================================================
+   填词游戏（AI 出题 · 挖空填字）—— 紫色系与复习/录入明显区分
+   ============================================================ */
+:root{ --game:#7C5CE0; --game-l:#EFE9FC; }
+@media (prefers-color-scheme: dark){
+  :root{ --game:#A78BFA; --game-l:#241B3D; }
+}
+.game-card{position:relative;padding:24px;}
+.game-card::before{
+  content:'';position:absolute;left:0;right:0;top:0;height:4px;
+  background:linear-gradient(90deg,var(--game),var(--primary));
+  border-radius:var(--r-lg) var(--r-lg) 0 0;
+}
+.game-head{
+  display:flex;align-items:center;gap:9px;flex:none;
+  padding-bottom:10px;margin-bottom:14px;
+  border-bottom:1px solid var(--line);
+}
+.game-head-mark{width:4px;height:19px;border-radius:3px;background:var(--game);flex:none;}
+.game-head strong{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:.3px;}
+.game-head-sub{font-size:12px;color:var(--muted);margin-left:auto;}
+.game-head .chip{min-height:34px;flex:none;font-size:12px;}
+.game-guide{text-align:center;padding:36px 10px;}
+.game-guide h2{margin:12px 0 6px;font-size:20px;color:var(--ink);}
+.game-guide p{margin:0 auto;max-width:430px;color:var(--muted);font-size:14px;line-height:1.75;}
+.game-guide .big-ic .ic{width:44px;height:44px;color:var(--game);}
+.game-body{flex:1;min-height:0;display:flex;flex-direction:column;}
+.game-grid{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px;}
+.game-quest-col{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;}
+.game-pick{display:flex;flex-direction:column;gap:8px;flex:none;}
+.game-pick-label{font-size:12.5px;font-weight:700;color:var(--ink-2);letter-spacing:.3px;}
+.game-chips{
+  display:flex;flex-wrap:wrap;gap:8px;max-height:118px;overflow-y:auto;
+  align-content:flex-start;padding:2px;overscroll-behavior:contain;
+  scrollbar-width:thin;
+}
+.g-chip{
+  position:relative;min-width:46px;height:44px;padding:0 10px;border-radius:12px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:var(--font-cn);font-size:24px;line-height:1;
+  background:var(--surface);border:1.5px solid var(--line-2);color:var(--ink);
+  transition:transform .12s ease,border-color .12s ease;
+}
+.g-chip:active{transform:scale(.93);}
+.g-chip.on{border-color:var(--game);color:var(--game);font-weight:700;box-shadow:0 0 0 3px var(--game-l);}
+.g-chip.cached::after{
+  content:'';position:absolute;top:6px;right:6px;
+  width:5px;height:5px;border-radius:50%;background:var(--game);opacity:.75;
+}
+.game-quest{
+  flex:1;min-height:180px;overflow-y:auto;overscroll-behavior:contain;
+  border:1.5px dashed var(--line-2);border-radius:16px;
+  background:var(--paper);padding:18px 20px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.gq-loading{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;flex:1;min-height:140px;
+  color:var(--muted);font-size:14px;text-align:center;line-height:1.7;
+}
+.gq-spin{
+  width:26px;height:26px;border-radius:50%;flex:none;
+  border:3px solid var(--line-2);border-top-color:var(--game);
+  animation:gqSpin 1s linear infinite;
+}
+@keyframes gqSpin{to{transform:rotate(360deg);}}
+.gq-type{
+  display:inline-flex;align-items:center;align-self:flex-start;
+  font-size:12px;font-weight:800;letter-spacing:1.5px;
+  color:var(--game);background:var(--game-l);
+  border-radius:9px;padding:4px 11px;flex:none;
+}
+.gq-text{
+  font-family:var(--font-cn);color:var(--ink);
+  font-size:clamp(24px,3vw,34px);line-height:1.8;letter-spacing:2px;
+  overflow-wrap:break-word;user-select:none;-webkit-user-select:none;
+}
+.gq-text.is-sent{font-size:clamp(18px,1.9vw,24px);letter-spacing:1px;line-height:1.9;}
+.g-blank{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:1.35em;height:1.35em;margin:0 .1em;vertical-align:-.25em;
+  border:2px dashed var(--game);border-radius:.28em;
+  color:var(--game);font-weight:700;font-family:var(--font-cn);
+  background:var(--game-l);
+}
+.g-blank.ok{border-style:solid;border-color:var(--primary);background:var(--primary-l);color:var(--primary);}
+.g-blank.hint{border-style:solid;border-color:var(--amber);background:transparent;color:var(--amber);}
+.gq-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none;margin-top:auto;}
+.gq-prog{display:flex;gap:6px;align-items:center;}
+.gq-prog i{width:9px;height:9px;border-radius:50%;background:var(--line-2);}
+.gq-prog i.cur{background:var(--game);transform:scale(1.3);}
+.gq-prog i.ok{background:var(--primary);}
+.gq-count{font-size:12.5px;color:var(--muted);font-weight:600;}
+.gq-done{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;flex:1;justify-content:center;min-height:140px;}
+.gq-done .ic{width:40px;height:40px;color:var(--game);}
+.gq-done h3{margin:0;font-size:20px;color:var(--ink);}
+.gq-done p{margin:0;color:var(--muted);font-size:14px;}
+.game-write-col{display:flex;flex-direction:column;align-items:center;gap:10px;min-width:0;min-height:0;}
+.game-write-col .tian-wrap{width:100%;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;}
+.game-tian{width:min(var(--pad-entry),100%);border-style:dashed;background:#fffdf5;}
+@media (prefers-color-scheme: dark){ .game-tian{background:var(--paper);} }
+#gamePadCanvas{
+  position:absolute;inset:3px;
+  width:calc(100% - 6px);height:calc(100% - 6px);
+  border-radius:10px;touch-action:none;
+  -webkit-user-select:none;user-select:none;
+  z-index:3;cursor:crosshair;
+}
+.game-tools{display:flex;gap:8px;flex:none;flex-wrap:wrap;justify-content:center;}
 .input,.textarea{
   width:100%;
   min-height:50px;padding:12px 14px;
@@ -1431,6 +1541,19 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   .lib-card .lc-py{font-size:12.5px;}
   .lib-card .lc-char{padding:2px 0;}
   .lib-card .lc-words{font-size:11px;}
+
+  /* --- 填词游戏：单列纵向排，页面正常滚动 --- */
+  .game-card{padding:12px 24px 14px;}
+  .game-head{margin-bottom:10px;padding-bottom:8px;}
+  .game-head-sub{display:none;}
+  .game-guide{padding:26px 6px;}
+  .game-chips{max-height:none;overflow:visible;}
+  .game-quest{min-height:0;padding:14px;gap:10px;}
+  .gq-text{font-size:24px;letter-spacing:1.5px;}
+  .gq-text.is-sent{font-size:17px;}
+  .game-write-col .tian-wrap{flex:none;}
+  .game-tian{width:min(var(--pad),82vw);}
+  .game-tools .mini{min-height:36px;padding:0 12px;}
 }
 
 /* ============================================================
@@ -1698,6 +1821,27 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   }
   #view-library .lib-grid::-webkit-scrollbar{width:6px;}
   #view-library .lib-grid::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px;}
+
+  /* --- 填词游戏：一屏锁定，左题右写；字多时 chips 自己滚 --- */
+  #view-game{justify-content:stretch;}
+  .game-card{
+    flex:1;min-height:0;max-height:100%;overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  .game-body{overflow:hidden;}
+  .game-grid{
+    flex:1;min-height:0;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) min(var(--pad-entry),44%);
+    gap:clamp(16px,2.2vw,32px);
+    align-items:stretch;
+  }
+  .game-quest-col{gap:9px;}
+  .game-write-col .tian{width:min(var(--pad-entry),100%);}
+  .game-quest{min-height:0;padding:16px 18px;gap:11px;}
+  .gq-text{font-size:clamp(26px,2.6vw,34px);}
+  .gq-text.is-sent{font-size:clamp(19px,1.8vw,24px);}
+  .game-tools .mini{min-height:37px;padding:0 14px;font-size:13.5px;}
 }
 
 /* Reserve a separate header row for card badges at every screen size. */
@@ -1744,6 +1888,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="m8.5 14.5-1 7 4.5-2.5 4.5 2.5-1-7"/></symbol>
   <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></symbol>
   <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3v4"/><path d="M12 17v4"/><path d="M3 12h4"/><path d="M17 12h4"/><path d="m6 6 2.5 2.5"/><path d="m15.5 15.5 2.5 2.5"/></symbol>
+  <symbol id="i-game" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><path d="M17 13.5v7"/><path d="M13.5 17h7"/></symbol>
 </defs></svg>
 
 <div class="app">
@@ -1772,6 +1917,10 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
         <svg class="ic"><use href="#i-book"/></svg>
         <span>我的字库</span>
         <span class="count" id="sideCountLib">0</span>
+      </button>
+      <button class="side-item" data-tab="game" id="side-game">
+        <svg class="ic"><use href="#i-game"/></svg>
+        <span>填词游戏</span>
       </button>
     </nav>
 
@@ -2050,6 +2199,71 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
         </div>
       </section>
 
+      <!-- ============ 2.5 填词游戏 ============ -->
+      <section id="view-game" class="view hidden">
+        <div class="card game-card">
+
+          <div class="game-head">
+            <span class="game-head-mark"></span>
+            <strong>填词游戏</strong>
+            <span class="game-head-sub">AI 出题 · 挖空填字 · 练字又长知识</span>
+            <button class="chip" id="btnAiCfg" type="button">
+              <svg class="ic"><use href="#i-gear"/></svg><span>AI 设置</span>
+            </button>
+          </div>
+
+          <!-- 引导态：没配 Key / 字库为空 -->
+          <div id="gameGuide" class="game-guide hidden">
+            <div class="big-ic"><svg class="ic"><use href="#i-game"/></svg></div>
+            <h2 id="gameGuideTitle">先连接 AI，才能自动出题</h2>
+            <p id="gameGuideText">填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个句子，把生字挖空，让你手写填字。</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px">
+              <button class="btn btn-primary" id="gameGuideBtn1">配置 DeepSeek</button>
+              <button class="btn btn-soft" data-goto="entry">去录入生字</button>
+            </div>
+          </div>
+
+          <!-- 游戏主体 -->
+          <div id="gameBody" class="game-body hidden">
+            <div class="game-grid">
+
+              <div class="game-quest-col">
+                <div class="game-pick">
+                  <div class="game-pick-label">选一个生字，让 AI 出题</div>
+                  <div class="game-chips" id="gameChips"></div>
+                </div>
+
+                <div class="game-quest" id="gameQuest"></div>
+              </div>
+
+              <div class="game-write-col">
+                <div class="tian-wrap">
+                  <div class="tian game-tian" id="gameTian">
+                    <canvas id="gamePadCanvas"></canvas>
+                  </div>
+                </div>
+                <div class="pad-hint" id="gameHint">
+                  <svg class="ic ic-sm"><use href="#i-pen"/></svg>
+                  <span>先选一个生字</span>
+                </div>
+                <div class="cands" id="gameCands"></div>
+                <div class="game-tools">
+                  <button class="mini" id="btnGameUndo" type="button">
+                    <svg class="ic"><use href="#i-undo"/></svg>撤销
+                  </button>
+                  <button class="mini" id="btnGameClear" type="button">清空</button>
+                  <button class="mini" id="btnGameHint" type="button">
+                    <svg class="ic"><use href="#i-bulb"/></svg>提示
+                  </button>
+                  <button class="mini" id="btnGameSkip" type="button">跳过</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ============ 3. 我的字库 ============ -->
       <section id="view-library" class="view hidden">
         <div class="lib-bar">
@@ -2114,6 +2328,10 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
     <button class="tab" data-tab="library" id="tab-library">
       <svg class="ic"><use href="#i-book"/></svg>
       <span>字库</span>
+    </button>
+    <button class="tab" data-tab="game" id="tab-game">
+      <svg class="ic"><use href="#i-game"/></svg>
+      <span>填词</span>
     </button>
   </nav>
 </div>
@@ -2320,7 +2538,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
       <span class="io-ico cloud-ico"><svg class="ic"><use href="#i-cloud"/></svg></span>
       <span class="io-txt">
         <b id="cloudTitle">云同步（可选）</b>
-        <em id="cloudSub">连上 GitHub 后，每次改动都会自动备份到你的私有 Gist</em>
+        <em id="cloudSub">连上 GitHub 后，改动自动备份到私有 Gist，多台设备自动保持同步</em>
       </span>
       <svg class="ic io-arrow"><use href="#i-right"/></svg>
     </button>
@@ -2371,7 +2589,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
       <span class="cs-dot" id="cloudDot"></span>
       <span class="cs-txt">
         <b id="cloudStateTitle">未连接</b>
-        <em id="cloudStateSub">连上后，每次改动会自动备份到你的私有 Gist</em>
+        <em id="cloudStateSub">连上后，改动自动备份，多台设备自动保持同步</em>
       </span>
     </div>
 
@@ -2442,6 +2660,49 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
       <button class="btn btn-primary" id="btnPullUseCloud" type="button">用云端的覆盖本地</button>
       <button class="btn btn-ghost" id="btnPullKeepLocal" type="button">保留本地并上传</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ 弹窗：AI 出题设置 ============ -->
+<div class="modal" id="modalAi">
+  <div class="backdrop" data-close></div>
+  <div class="panel">
+    <div class="panel-head">
+      <h3>AI 出题设置</h3>
+      <button class="close" data-close><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+
+    <div class="cloud-state">
+      <span class="cs-dot" id="aiDot"></span>
+      <span class="cs-txt">
+        <b id="aiStateTitle">未配置</b>
+        <em id="aiStateSub">填词游戏用 DeepSeek 生成成语和句子，需要一个 API Key</em>
+      </span>
+    </div>
+
+    <div class="field" style="margin-top:14px">
+      <label for="aiKey">DeepSeek API Key</label>
+      <input class="input" id="aiKey" type="password" spellcheck="false"
+             autocomplete="off" autocapitalize="off" autocorrect="off"
+             placeholder="sk- 开头的那一串" />
+      <div class="vf-note">Key 只存在这台设备上，不会写进网页文件，可随时在这里清除或去后台删除。</div>
+    </div>
+
+    <details class="cloud-how">
+      <summary>怎么拿到 Key？（一次性，约 1 分钟）</summary>
+      <ol>
+        <li>电脑或手机打开 <b>platform.deepseek.com</b>，注册 / 登录</li>
+        <li>左侧 <b>API Keys</b> → <b>Create new key</b>，起个名字（如「错字本」）</li>
+        <li>复制生成的一串（<b>sk-</b> 开头，只显示一次），粘到上面</li>
+        <li>DeepSeek 按用量计费，出一次题消耗很少（几厘钱）；Key 可随时在 DeepSeek 后台删除</li>
+      </ol>
+    </details>
+
+    <div class="row-2" style="margin-top:12px">
+      <button class="btn btn-primary" id="btnAiSave" type="button" style="flex:1">保存</button>
+      <button class="btn btn-ghost" id="btnAiTest" type="button" style="flex:1">测试连接</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="btnAiClear" type="button" style="width:100%;margin-top:10px">清除 Key</button>
   </div>
 </div>
 
@@ -11271,8 +11532,486 @@ function restore(){
 }
 
 /* ============================================================
+   10.4 填词游戏（AI 出题 · 挖空填字）
+   —— 根据录入的生字，用 DeepSeek 生成 3 个成语 + 3 个句子，
+      把生字挖空，手写填对才算过关；题目按字缓存在本机，不重复花钱。
+   ============================================================ */
+const AI_STORE  = 'hanzi.ai.v1';      // { key } —— DeepSeek API Key，只存本机
+const GAME_STORE = 'hanzi.game.v1';   // { 字: {i:[成语], s:[句子], at:时间} }
+const AI = { key:'' };
+const GAME = {
+  pad:null,                 // 游戏专属手写板（与录入板相互独立）
+  char:'',                  // 当前出题的生字
+  items:[], idx:0, states:[],   // 每题状态：'' | 'ok' | 'skip'
+  busy:false, pendingChar:'',
+  recTimer:null, lastSig:null,
+  hintOn:false              // 当前题是否已亮过答案
+};
+
+function loadAi(){
+  try{ AI.key = (JSON.parse(localStorage.getItem(AI_STORE) || '{}').key) || ''; }catch(e){}
+}
+function saveAi(){
+  try{ localStorage.setItem(AI_STORE, JSON.stringify({ key: AI.key })); }catch(e){}
+}
+
+/* ---------- 题目缓存（按字，最多 60 个字） ---------- */
+function gameCacheAll(){
+  try{ return JSON.parse(localStorage.getItem(GAME_STORE) || '{}') || {}; }catch(e){ return {}; }
+}
+function gameCacheGet(ch){
+  const c = gameCacheAll()[ch];
+  if(!c) return null;
+  const i = (c.i || []).filter(function(s){ return typeof s === 'string' && s.indexOf(ch) >= 0; });
+  const s = (c.s || []).filter(function(t){ return typeof t === 'string' && t.indexOf(ch) >= 0; });
+  if(!i.length && !s.length) return null;
+  return { idioms: i, sentences: s };
+}
+function gameCacheSet(ch, idioms, sentences){
+  const all = gameCacheAll();
+  all[ch] = { i: idioms, s: sentences, at: Date.now() };
+  const keys = Object.keys(all);
+  if(keys.length > 60){
+    keys.sort(function(a, b){ return (all[a].at || 0) - (all[b].at || 0); });
+    keys.slice(0, keys.length - 60).forEach(function(k){ delete all[k]; });
+  }
+  try{ localStorage.setItem(GAME_STORE, JSON.stringify(all)); }catch(e){}
+}
+
+/* ---------- DeepSeek 调用（浏览器直连，已验证支持 CORS） ---------- */
+async function deepseekChat(sysPrompt, userPrompt){
+  const res = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AI.key },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user',   content: userPrompt }
+      ],
+      temperature: 1.2,
+      max_tokens: 700,
+      response_format: { type: 'json_object' },
+      stream: false
+    })
+  });
+  let data = null;
+  try{ data = await res.json(); }catch(e){}
+  if(!res.ok){
+    const err = new Error((data && data.error && data.error.message) || ('HTTP ' + res.status));
+    err.status = res.status;
+    throw err;
+  }
+  return (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+}
+
+function parseAiJson(txt){
+  if(!txt) return null;
+  let t = String(txt).trim();
+  const m = t.match(/\{[\s\S]*\}/);
+  if(m) t = m[0];
+  try{ return JSON.parse(t); }catch(e){ return null; }
+}
+
+async function aiGenFor(ch, retry){
+  const sys = '你是一位资深语文老师，为小学生设计硬笔书法练习素材。你的回答永远是一个严格的 JSON 对象，不含任何其他文字。';
+  const user =
+    '请为生字「' + ch + '」生成练习素材：\n' +
+    '1. 3 个包含「' + ch + '」字的成语；\n' +
+    '2. 3 个包含「' + ch + '」字的句子。\n' +
+    '要求：\n' +
+    '- 成语和句子必须完整包含用户提供的生字「' + ch + '」；\n' +
+    '- 句意优美、积极向上，带有画面感，兼具科普或文学色彩（避免干巴巴的口号）；\n' +
+    '- 句子长度适中（15～30 字），适合作为硬笔书法练习的范本；\n' +
+    '- 成语选常见、用法规范的，不要生造。\n' +
+    '只输出 JSON：{"idioms":["","",""],"sentences":["","",""]}';
+  const txt = await deepseekChat(sys, retry
+    ? '注意：上一次的结果里有不包含「' + ch + '」字的条目，请严格自查每一项都必须完整包含「' + ch + '」这个字。\n' + user
+    : user);
+  const j = parseAiJson(txt);
+  if(!j || !Array.isArray(j.idioms) || !Array.isArray(j.sentences)) throw new Error('AI 返回的格式不对');
+  const idioms = j.idioms.map(function(s){ return String(s).trim(); })
+    .filter(function(s){ return s.indexOf(ch) >= 0 && s.length >= 3 && s.length <= 10; });
+  const sentences = j.sentences.map(function(s){ return String(s).trim(); })
+    .filter(function(s){ return s.indexOf(ch) >= 0 && s.length >= 8 && s.length <= 60; });
+  return { idioms: idioms.slice(0, 3), sentences: sentences.slice(0, 3) };
+}
+
+async function aiGen(ch){
+  let r = await aiGenFor(ch, false);
+  if(!r.idioms.length || !r.sentences.length){
+    r = await aiGenFor(ch, true);      // 有不达标条目 → 提醒模型自查重试一次
+  }
+  if(!r.idioms.length && !r.sentences.length) throw new Error('AI 没有生成包含「' + ch + '」的内容');
+  return r;
+}
+
+/* ---------- 游戏流程 ---------- */
+function initGamePad(){
+  if(GAME.pad) return;
+  const wrap = $('gameTian'), cv = $('gamePadCanvas');
+  if(!wrap || !cv) return;
+  GAME.pad = new Pad(wrap, cv);
+  GAME.pad.onInk = gameInkChanged;
+}
+
+/* 出题字源：未掌握的排前面，同组内按录入时间倒序（最近录入的优先） */
+function gameChars(){
+  const arr = S.words.slice();
+  arr.sort(function(a, b){
+    if(!!a.mastered !== !!b.mastered) return a.mastered ? 1 : -1;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+  return arr.map(function(w){ return w.char; });
+}
+
+function renderGameChips(){
+  const box = $('gameChips');
+  if(!box) return;
+  box.innerHTML = '';
+  gameChars().forEach(function(ch){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'g-chip' + (ch === GAME.char ? ' on' : '') + (gameCacheGet(ch) ? ' cached' : '');
+    b.textContent = ch;
+    b.addEventListener('click', function(){ startGame(ch, false); });
+    box.appendChild(b);
+  });
+}
+
+/* 有 Key 且字库非空 → 显示游戏主体；否则显示引导 */
+function gameShowGuide(){
+  const ok = !!AI.key && S.words.length > 0;
+  const guide = $('gameGuide'), body = $('gameBody');
+  if(!guide || !body) return false;
+  if(ok){ guide.classList.add('hidden'); body.classList.remove('hidden'); return true; }
+  guide.classList.remove('hidden'); body.classList.add('hidden');
+  $('gameGuideTitle').textContent = !AI.key ? '先连接 AI，才能自动出题' : '字库里还没有生字';
+  $('gameGuideText').textContent = !AI.key
+    ? '填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个优美句子，把生字挖空，让你手写填字。'
+    : '先去「录入」添加几个生字，再回来玩填词游戏。';
+  $('gameGuideBtn1').classList.toggle('hidden', !!AI.key);
+  return false;
+}
+
+async function startGame(ch, force){
+  if(GAME.busy && GAME.pendingChar === ch) return;
+  GAME.char = ch;
+  renderGameChips();
+
+  let data = force ? null : gameCacheGet(ch);
+  if(!data){
+    GAME.busy = true;
+    GAME.pendingChar = ch;
+    renderGameLoading(ch);
+    try{
+      data = await aiGen(ch);
+      gameCacheSet(ch, data.idioms, data.sentences);
+      renderGameChips();
+    }catch(e){
+      GAME.busy = false; GAME.pendingChar = '';
+      renderGameError(ch, e);
+      return;
+    }
+    GAME.busy = false; GAME.pendingChar = '';
+    if(GAME.char !== ch) return;         // 等待期间用户已换别的字
+  }
+
+  GAME.items = [];
+  data.idioms.forEach(function(t){ GAME.items.push({ type: 'idiom', text: t }); });
+  data.sentences.forEach(function(t){ GAME.items.push({ type: 'sentence', text: t }); });
+  GAME.idx = 0;
+  GAME.states = GAME.items.map(function(){ return ''; });
+  GAME.hintOn = false;
+  renderGameQuest();
+}
+
+function renderGameLoading(ch){
+  $('gameQuest').innerHTML =
+    '<div class="gq-loading"><span class="gq-spin"></span>' +
+    '<span>正在请 AI 为「' + escHtml(ch) + '」出题：3 个成语 + 3 个句子…<br>第一次约需十几秒，之后这个字会缓存起来</span></div>';
+  resetGameInput();
+}
+
+function renderGameError(ch, e){
+  let msg = (e && e.message) || '生成失败';
+  if(e && e.status === 401) msg = 'API Key 无效，请检查 AI 设置';
+  else if(e && e.status === 402) msg = 'DeepSeek 账户余额不足';
+  else if(e && e.status === 429) msg = '调用太频繁，稍等几秒再试';
+  $('gameQuest').innerHTML =
+    '<div class="gq-loading">' +
+      '<svg class="ic" style="width:32px;height:32px;color:var(--red)"><use href="#i-x"/></svg>' +
+      '<span>「' + escHtml(ch) + '」出题失败：' + escHtml(msg) + '</span>' +
+      '<button class="btn btn-soft" id="gqRetry" type="button">重试</button>' +
+    '</div>';
+  const r = $('gqRetry');
+  if(r) r.addEventListener('click', function(){ startGame(ch, true); });
+}
+
+function renderGameIdle(){
+  GAME.char = ''; GAME.items = []; GAME.idx = 0; GAME.states = []; GAME.hintOn = false;
+  renderGameChips();
+  $('gameQuest').innerHTML =
+    '<div class="gq-loading">' +
+      '<svg class="ic" style="width:34px;height:34px;color:var(--game)"><use href="#i-game"/></svg>' +
+      '<span>点上面的生字开始 —— AI 会生成 3 个成语和 3 个句子，<br>把生字挖空，用手写板写对才算过关</span>' +
+    '</div>';
+  resetGameInput();
+  $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>先选一个生字</span>';
+}
+
+/* 把目标字挖空显示；答对变绿，看过提示变琥珀色 */
+function questHtml(item, state, ch){
+  const t = item.text;
+  const i = t.indexOf(ch);
+  if(i < 0) return escHtml(t);
+  const cls = state === 'ok' ? 'g-blank ok' : (GAME.hintOn ? 'g-blank hint' : 'g-blank');
+  const inner = (state === 'ok' || GAME.hintOn) ? ch : '?';
+  return escHtml(t.slice(0, i)) +
+    '<span class="' + cls + '">' + escHtml(inner) + '</span>' +
+    escHtml(t.slice(i + 1));
+}
+
+function renderGameQuest(){
+  const q = $('gameQuest');
+  if(!q || !GAME.items.length) return;
+  const item = GAME.items[GAME.idx];
+  const st = GAME.states[GAME.idx];
+  let dots = '';
+  GAME.states.forEach(function(s, k){
+    dots += '<i class="' + (s === 'ok' ? 'ok' : (k === GAME.idx ? 'cur' : '')) + '"></i>';
+  });
+  const w = S.words.filter(function(x){ return x.char === GAME.char; })[0];
+  const py = (w && w.pinyin) || pyOf(GAME.char, (w && w.words) || []);
+  q.innerHTML =
+    '<div class="gq-type">' + (item.type === 'idiom' ? '成语填空' : '句子填空') + '</div>' +
+    '<div class="gq-text' + (item.type === 'sentence' ? ' is-sent' : '') + '">' + questHtml(item, st, GAME.char) + '</div>' +
+    '<div class="gq-foot">' +
+      '<span class="gq-prog">' + dots + '</span>' +
+      '<span class="gq-count">第 ' + (GAME.idx + 1) + ' / ' + GAME.items.length + ' 题' +
+      (py ? ' · 这个字读「' + escHtml(py) + '」' : '') + '</span>' +
+    '</div>';
+  resetGameInput();
+  $('gameHint').innerHTML =
+    '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>在格子里写出去掉的「' + escHtml(GAME.char) + '」</span>';
+}
+
+function renderGameDone(){
+  const ok = GAME.states.filter(function(s){ return s === 'ok'; }).length;
+  const skip = GAME.states.filter(function(s){ return s === 'skip'; }).length;
+  $('gameQuest').innerHTML =
+    '<div class="gq-done">' +
+      '<svg class="ic"><use href="#i-award"/></svg>' +
+      '<h3>「' + escHtml(GAME.char) + '」过关！</h3>' +
+      '<p>写对 ' + ok + ' / ' + GAME.items.length + ' 题' + (skip ? ' · 跳过 ' + skip + ' 题' : '') + '</p>' +
+      '<div class="gq-foot" style="justify-content:center;margin-top:4px">' +
+        '<button class="btn btn-soft" id="gqAgain" type="button">重新出题再练</button>' +
+        '<button class="btn btn-primary" id="gqNext" type="button">换个生字</button>' +
+      '</div>' +
+    '</div>';
+  resetGameInput();
+  $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-check"/></svg><span>这一轮完成！</span>';
+  const a = $('gqAgain'), n = $('gqNext');
+  if(a) a.addEventListener('click', function(){ startGame(GAME.char, true); });
+  if(n) n.addEventListener('click', renderGameIdle);
+}
+
+/* ---------- 手写答题（复用手写识别引擎） ---------- */
+function resetGameInput(){
+  if(GAME.pad) GAME.pad.clear();
+  GAME.lastSig = null;
+  $('gameCands').innerHTML = '';
+}
+
+function gameInkChanged(){
+  clearTimeout(GAME.recTimer);
+  if(!GAME.char || GAME.idx >= GAME.items.length) return;
+  if(!GAME.pad || GAME.pad.isEmpty()){ GAME.lastSig = null; return; }
+  if(GAME.pad.pid !== null && GAME.pad.pid !== undefined) return;
+  if(inkSignature(GAME.pad) === GAME.lastSig) return;
+  GAME.recTimer = setTimeout(runGameRecognize, 900);
+}
+
+function runGameRecognize(){
+  if(!GAME.char || GAME.idx >= GAME.items.length) return;
+  if(!GAME.pad || GAME.pad.isEmpty()) return;
+  if(GAME.pad.pid !== null && GAME.pad.pid !== undefined) return;
+  if(inkSignature(GAME.pad) === GAME.lastSig) return;
+  const hint = $('gameHint');
+
+  const doRec = function(){
+    const sig = inkSignature(GAME.pad);
+    const finish = function(res){
+      if(!GAME.pad || inkSignature(GAME.pad) !== sig) return;   // 推理期间又动了笔，丢弃结果
+      GAME.lastSig = sig;
+      if(!res || !res.length){
+        hint.innerHTML = '<span>没认出来，写大一点、写清楚些</span>';
+        return;
+      }
+      const target = GAME.char;
+      let hit = false;
+      const box = $('gameCands');
+      box.innerHTML = '';
+      res.forEach(function(r){
+        if(r.ch === target) hit = true;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cand-chip' + (r.ch === target ? ' top' : '');
+        b.textContent = r.ch;
+        box.appendChild(b);
+      });
+      if(hit){
+        gameAnswerOk();
+      }else{
+        hint.innerHTML = '<span>写的是「' + escHtml(res[0].ch) + '」吗？要写的是「' + escHtml(target) + '」，再试一次</span>';
+      }
+    };
+    if(OcrHWR.isReady()){
+      OcrHWR.recognize(GAME.pad).then(function(res){
+        if(res && res.length) return finish(res);
+        finish(Recognizer.recognize(GAME.pad));
+      }).catch(function(){ finish(Recognizer.recognize(GAME.pad)); });
+    }else{
+      finish(Recognizer.recognize(GAME.pad));
+    }
+  };
+
+  if(!hwrReady()){
+    hint.innerHTML = '<span>正在准备识别引擎…</span>';
+    hwrEnsure(function(p){
+      hint.innerHTML = '<span>正在准备识别模型 ' + Math.round(p * 100) + '%…（首次使用需下载约 16MB）</span>';
+    }, function(ok){
+      if(!ok){ hint.innerHTML = '<span>识别引擎没准备好，稍后再试</span>'; return; }
+      setTimeout(runGameRecognize, 20);
+    });
+    return;
+  }
+  hint.innerHTML = '<span>正在识别…</span>';
+  setTimeout(doRec, 16);
+}
+
+function gameAnswerOk(){
+  GAME.states[GAME.idx] = 'ok';
+  renderGameQuest();                 // 空格里亮出正确答案（绿色），并清空手写板
+  $('gameHint').innerHTML =
+    '<svg class="ic ic-sm" style="color:var(--primary)"><use href="#i-check"/></svg><span>写对了！</span>';
+  setTimeout(function(){
+    if(GAME.states[GAME.idx] !== 'ok') return;      // 状态被重置就不动
+    if(GAME.idx >= GAME.items.length - 1){
+      renderGameDone();
+    }else{
+      GAME.idx++;
+      GAME.hintOn = false;
+      renderGameQuest();
+    }
+  }, 900);
+}
+
+function gameHintShow(){
+  if(!GAME.char || GAME.idx >= GAME.items.length) return;
+  GAME.hintOn = true;
+  renderGameQuest();
+  $('gameHint').innerHTML =
+    '<svg class="ic ic-sm" style="color:var(--amber)"><use href="#i-bulb"/></svg>' +
+    '<span>答案就是「' + escHtml(GAME.char) + '」· 看清楚再写一遍</span>';
+}
+
+function gameSkip(){
+  if(!GAME.char || GAME.idx >= GAME.items.length) return;
+  GAME.states[GAME.idx] = 'skip';
+  GAME.hintOn = true;                // 跳过也把答案亮出来，看一眼
+  renderGameQuest();
+  $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-right"/></svg><span>跳过这一题，看一眼答案</span>';
+  setTimeout(function(){
+    if(GAME.states[GAME.idx] !== 'skip') return;
+    if(GAME.idx >= GAME.items.length - 1){
+      renderGameDone();
+    }else{
+      GAME.idx++;
+      GAME.hintOn = false;
+      renderGameQuest();
+    }
+  }, 900);
+}
+
+/* ---------- AI 设置弹窗 ---------- */
+function openAiModal(){
+  refreshAiUI();
+  const k = $('aiKey');
+  if(k) k.value = '';
+  openModal('modalAi');
+}
+function refreshAiUI(){
+  const on = !!AI.key;
+  const t = $('aiStateTitle'), s = $('aiStateSub'), dot = $('aiDot');
+  if(t) t.textContent = on ? '已配置' : '未配置';
+  if(s) s.textContent = on
+    ? 'Key 已保存在本机，填词游戏随时可用'
+    : '填词游戏用 DeepSeek 生成成语和句子，需要一个 API Key';
+  if(dot){ dot.classList.toggle('ok', on); dot.classList.remove('err'); }
+}
+function aiSave(){
+  const k = ($('aiKey').value || '').trim();
+  if(!k){ toast('先粘贴 Key（sk- 开头）'); return; }
+  if(k.indexOf('sk-') !== 0 && k.length < 20){ toast('这看起来不像 DeepSeek Key，请检查'); return; }
+  AI.key = k;
+  saveAi();
+  refreshAiUI();
+  gameShowGuide();
+  renderGameChips();
+  toast('已保存，可以玩填词游戏了');
+}
+async function aiTest(){
+  const k = ($('aiKey').value || '').trim() || AI.key;
+  if(!k){ toast('先粘贴 Key'); return; }
+  const old = AI.key;
+  AI.key = k;
+  const btn = $('btnAiTest');
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = '测试中…';
+  try{
+    await deepseekChat('你是一台回声机。', '只输出 JSON：{"ok":true}');
+    toast('连接成功，AI 已就绪');
+    if(($('aiKey').value || '').trim()) aiSave();
+  }catch(e){
+    toast('连接失败：' + ((e && e.message) || '网络错误'));
+  }
+  AI.key = old;
+  saveAi();
+  btn.disabled = false;
+  btn.textContent = label;
+}
+function aiClear(){
+  AI.key = '';
+  saveAi();
+  refreshAiUI();
+  gameShowGuide();
+  toast('已清除 Key');
+}
+
+function bindGame(){
+  $('btnGameUndo').addEventListener('click', function(){
+    if(GAME.pad && !GAME.pad.undo()) toast('没有可以撤销的笔画');
+  });
+  $('btnGameClear').addEventListener('click', function(){
+    if(GAME.pad) GAME.pad.clear();
+    GAME.lastSig = null;
+    $('gameCands').innerHTML = '';
+  });
+  $('btnGameHint').addEventListener('click', gameHintShow);
+  $('btnGameSkip').addEventListener('click', gameSkip);
+  $('btnAiCfg').addEventListener('click', openAiModal);
+  $('gameGuideBtn1').addEventListener('click', openAiModal);
+  $('btnAiSave').addEventListener('click', aiSave);
+  $('btnAiTest').addEventListener('click', function(){ aiTest(); });
+  $('btnAiClear').addEventListener('click', aiClear);
+}
+
+/* ============================================================
    10.5 云同步（GitHub Gist，纯前端直连，零成本）
-   —— 说明：网页无法后台定时，所以只在「数据改动后」和「打开 App 时」两个时机同步
+   —— 发布：数据改动后自动上传；订阅：App 打开期间每 20 秒探测云端，
+      其他设备的改动自动同步过来（cloudSubTick）
    ============================================================ */
 const CLOUD_KEY  = 'hanzi.cloud.v1';     // { token, gistId, auto, lastSync }
 const META_KEY   = 'hanzi.meta.v1';      // { updatedAt } 本地最后改动时间
@@ -11515,6 +12254,49 @@ async function cloudCheckOnOpen(){
   }
 }
 
+/* ---- pub/sub 订阅：App 打开期间持续探测云端（约 20 秒一次）----
+   发布 = cloudSyncSoon（本机改动后自动上传，已有）；
+   订阅 = 这里轮询 Gist：发现别的设备推了新版本——
+     · 本机没有未上传的改动 → 静默应用，toast 告知；
+     · 云端明显更新（本机落后很多）→ 弹窗问；
+     · 本机也有新改动 → 本机先推（与打开时的策略一致）。 */
+let cloudSubTimer = null;
+const CLOUD_SUB_MS = 20000;
+
+function startCloudSub(){
+  if(cloudSubTimer) return;
+  cloudSubTimer = setInterval(cloudSubTick, CLOUD_SUB_MS);
+}
+function stopCloudSub(){
+  clearInterval(cloudSubTimer);
+  cloudSubTimer = null;
+}
+
+async function cloudSubTick(){
+  if(!cloudOn() || !CLOUD.auto) return;         // 未连接 / 关了自动同步：不订阅
+  if(document.hidden || CLOUD.busy || CLOUD.queued) return;   // 后台 / 正在传：跳过本轮
+  if(CLOUD.pending) return;                     // 冲突弹窗还没处理
+  try{
+    const remote = await cloudFetch();
+    if(!remote || !Array.isArray(remote.words) || !remote.words.length) return;
+    const rAt = remote.updatedAt || 0;
+    if(rAt <= (CLOUD.remoteAt || 0)) return;    // 没有新版本（自己刚推的也挡在这里）
+    const local = localAt();
+    if(local <= (CLOUD.remoteAt || 0) + 3000){
+      /* 本机干净：直接应用云端新版本，这就是「订阅生效」 */
+      CLOUD.remoteAt = rAt;
+      cloudApplyRemote(remote, true);
+      toast('已同步其他设备的改动（云端共 ' + remote.words.length + ' 个字）');
+    }else if(rAt > local + 3000){
+      showCloudConflict(remote);
+    }else{
+      /* 本机也有未上传的改动：先推本机，保持「谁在线谁先传」 */
+      cloudPush().then(function(){ refreshCloudUI(); }).catch(function(){});
+    }
+  }catch(e){ /* 网络 / 限流：静默，下个周期再试 */ }
+}
+window.__cloudSubTick = cloudSubTick;   // 测试钩子
+
 function showCloudConflict(remote){
   CLOUD.pending = remote;
   const el = $('cloudPullText');
@@ -11571,7 +12353,7 @@ function refreshCloudUI(){
   if(ss){
     ss.textContent = on
       ? (CLOUD.lastErr ? CLOUD.lastErr : ('上次备份 ' + agoText(CLOUD.lastSync) + ' · 本机 ' + S.words.length + ' 个字'))
-      : '连上后，每次改动会自动备份到你的私有 Gist';
+      : '连上后，改动自动备份，多台设备自动保持同步';
   }
 
   $('cloudSetup').hidden = on;
@@ -11580,7 +12362,8 @@ function refreshCloudUI(){
   const stats = $('cloudStats');
   if(stats && on){
     stats.innerHTML = '本机 <b>' + S.words.length + '</b> 个字 · 上次备份 <b>' + agoText(CLOUD.lastSync) + '</b>' +
-      '<br>云端文件：Gist ' + String(CLOUD.gistId).slice(0, 8) + '…（可在 GitHub 的 Gist 列表里看到历史版本）';
+      '<br>云端文件：Gist ' + String(CLOUD.gistId).slice(0, 8) + '…（可在 GitHub 的 Gist 列表里看到历史版本）' +
+      '<br>实时订阅：' + (CLOUD.auto ? '其他设备的改动约 20 秒内自动同步过来' : '已关闭（开启后多设备自动保持一致）');
   }
   const auto = $('cloudAuto');
   if(auto) auto.checked = !!CLOUD.auto;
@@ -11850,7 +12633,7 @@ function switchTab(tab, focusChar){
   if(tab !== 'library' && S.selMode){ S.selMode = false; S.sel.clear(); syncSelUI(); }
   S.tab = tab;
 
-  ['review','entry','library'].forEach(function(t){
+  ['review','entry','library','game'].forEach(function(t){
     const v = $('view-' + t);
     if(!v) return;
     const on = (t === tab);
@@ -11888,6 +12671,15 @@ function switchTab(tab, focusChar){
 
   if(tab === 'library'){
     renderLib();
+  }
+
+  if(tab === 'game'){
+    setTimeout(function(){
+      initGamePad();
+      if(GAME.pad) GAME.pad.resize();
+      renderGameChips();
+      if(gameShowGuide() && !GAME.items.length) renderGameIdle();
+    }, 60);
   }
 
   window.scrollTo({ top:0, behavior:'auto' });
@@ -12406,9 +13198,11 @@ function boot(){
   loadStore();
   loadEngineMode();
   loadCloud();
+  loadAi();
   updateCounts();
   initPad();
   bind();
+  bindGame();
   setLibFilter('learning');
   switchTab('review');
   loadOptionalScripts();
@@ -12420,6 +13214,9 @@ function boot(){
 
   // 打开时比对一次云端备份（云端更新就弹窗问，不自动覆盖本地）
   setTimeout(cloudCheckOnOpen, 2200);
+
+  // pub/sub 订阅：App 打开期间每 20 秒探测云端，其他设备的改动自动同步过来
+  startCloudSub();
 
   // 空闲时预装载手写识别数据（一次性约 200ms），第一次手写识别就不用等
   setTimeout(function(){
@@ -12459,17 +13256,19 @@ function boot(){
   window.addEventListener('resize', function(){
     if(pad) setTimeout(function(){ pad.resize(); }, 80);
     if(entryPad) setTimeout(function(){ entryPad.resize(); }, 90);
+    if(GAME.pad) setTimeout(function(){ GAME.pad.resize(); }, 100);
     rebuildQuiz();
   });
   window.addEventListener('orientationchange', function(){
-    setTimeout(function(){ if(pad) pad.resize(); if(entryPad) entryPad.resize(); rebuildQuiz(); }, 320);
+    setTimeout(function(){ if(pad) pad.resize(); if(entryPad) entryPad.resize(); if(GAME.pad) GAME.pad.resize(); rebuildQuiz(); }, 320);
   });
 
-  // 切回前台时刷新尺寸（iPad 分屏 / 旋转），并补一次健康探测
+  // 切回前台时刷新尺寸（iPad 分屏 / 旋转），并补一次健康探测 + 立刻订阅探测一次云端
   document.addEventListener('visibilitychange', function(){
     if(document.hidden){ if(CLOUD.queued) cloudSyncSoon(0); return; }
     if(cloudOn() && CLOUD.auto && localAt() > (CLOUD.remoteAt || CLOUD.lastSync)) cloudSyncSoon(0);
-    setTimeout(function(){ if(pad) pad.resize(); if(entryPad) entryPad.resize(); }, 120);
+    setTimeout(cloudSubTick, 800);
+    setTimeout(function(){ if(pad) pad.resize(); if(entryPad) entryPad.resize(); if(GAME.pad) GAME.pad.resize(); }, 120);
     if(ENG.mode !== 'local' && !ENG.healthy && Date.now() >= ENG.retryAt) probeStrict();
   });
 }
