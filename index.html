@@ -8376,7 +8376,6 @@ function save(){
     localStorage.setItem(SIZE_KEY, String(S.roundSize));
   }catch(e){}
   touchMeta();
-  rtChanged();
   updateCounts();
   cloudSyncSoon();
 }
@@ -11713,7 +11712,7 @@ function gameShowGuide(){
 }
 
 async function startGame(ch, force){
-  if(GAME.busy && GAME.pendingChar === ch) return;
+  if(GAME.busy){toast('正在出题，请稍候');return;}
   GAME.char = ch;
   renderGameChips();
 
@@ -11880,12 +11879,13 @@ function runGameRecognize(){
         b.type = 'button';
         b.className = 'cand-chip' + (r.ch === target ? ' top' : '');
         b.textContent = r.ch;
+        b.onclick=function(){if(r.ch===target)gameAnswerOk();else toast('再想一想');};
         box.appendChild(b);
       });
       if(hit){
-        gameAnswerOk();
+        hint.textContent='请选择你写出的字，确认填入空格';
       }else{
-        hint.innerHTML = '<span>写的是「' + escHtml(res[0].ch) + '」吗？要写的是「' + escHtml(target) + '」，再试一次</span>';
+        hint.innerHTML = '<span>写的是「' + escHtml(res[0].ch) + '」吗？再读一遍题目，想一想空格里该填什么</span>';
       }
     };
     if(OcrHWR.isReady()){
@@ -12136,6 +12136,7 @@ async function cloudPush(){
   CLOUD.remoteAt = payload.updatedAt;
   CLOUD.lastErr = '';
   saveCloud();
+  signalPublish(payload.updatedAt);
   return payload;
 }
 
@@ -12260,9 +12261,6 @@ async function cloudCheckOnOpen(){
 }
 
 /* 实时订阅由 WebSocket 推送；Gist 仅用于持久备份。 */
-function startCloudSub(){}
-function stopCloudSub(){}
-async function cloudSubTick(){}
 
 function showCloudConflict(remote){
   CLOUD.pending = remote;
@@ -12277,13 +12275,13 @@ function showCloudConflict(remote){
 
 function cloudApplyRemote(remote, quiet){
   const arr = Array.isArray(remote) ? remote : (remote && remote.words) || [];
-  if(!arr.length){ toast('云端没有可用的字库数据'); return; }
+  const normalized=arr.map(normalizeWord);
+  if(normalized.some(w=>!w)){toast('云端数据格式不对，已放弃');return;}
   S.words = [];
   arr.forEach(function(entry){
     const n = normalizeWord(entry);
     if(n) S.words.push(n);
   });
-  if(!S.words.length){ toast('云端数据格式不对，已放弃'); return; }
   CLOUD.skipOnce = true;               // 刚拉下来的内容不用立刻再推回去
   save();
   try{ localStorage.setItem(META_KEY, JSON.stringify({ updatedAt: (remote && remote.updatedAt) || Date.now() })); }catch(e){}
@@ -12330,8 +12328,10 @@ function refreshCloudUI(){
   if(stats && on){
     stats.innerHTML = '本机 <b>' + S.words.length + '</b> 个字 · 上次备份 <b>' + agoText(CLOUD.lastSync) + '</b>' +
       '<br>云端文件：Gist ' + String(CLOUD.gistId).slice(0, 8) + '…（可在 GitHub 的 Gist 列表里看到历史版本）' +
-      '<br>实时订阅：' + (CLOUD.auto ? '实时同步请配置上方 Pub/Sub 连接' : '已关闭（开启后多设备自动保持一致）');
+      '<br>实时订阅：' + (CLOUD.auto ? 'MQTT 通知驱动同步（通常数秒，取决于网络）' : '已关闭（开启后多设备自动保持一致）');
   }
+  startCloudSub();
+  refreshSignalStatus();
   const auto = $('cloudAuto');
   if(auto) auto.checked = !!CLOUD.auto;
 }
@@ -13154,92 +13154,53 @@ function syncAppHeight(){
   if(h > 0) document.documentElement.style.setProperty('--app-h', h + 'px');
 }
 
-// Loaded inside the app closure; the browser keeps a durable outbox across reloads.
-const RT_KEY='hanzi.pubsub.v1', RT_OUT='hanzi.pubsub.outbox.v1';
-const RT={ws:null, revision:0, ready:false, dirty:!!localStorage.getItem(RT_OUT), seq:0, flight:null, pending:null, timer:null, retry:0};
-function rtConfig(){try{return JSON.parse(localStorage.getItem(RT_KEY)||'{}');}catch(e){return {};}}
-function rtStatus(text){const el=$('rtStatus');if(el) el.textContent=text;}
-function rtChanged(){
-  RT.dirty=true; RT.seq++;
-  localStorage.setItem(RT_OUT,'1');
-  clearTimeout(RT.publishTimer); RT.publishTimer=setTimeout(rtPublish,300);
+/* Gist stores private data; MQTT transports lightweight notifications only. */
+const SIGNAL={client:null,identity:'',topic:'',loading:null,connecting:false,status:'等待连接',pulling:false,timer:null,target:0};
+function signalStatus(s){SIGNAL.status=s;const el=$('mqttStatus');if(el)el.textContent='实时通知：'+s;}
+function mqttLibrary(){
+  if(window.mqtt)return Promise.resolve(window.mqtt);
+  if(SIGNAL.loading)return SIGNAL.loading;
+  SIGNAL.loading=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/mqtt@5.10.4/dist/mqtt.min.js';s.onload=()=>window.mqtt?resolve(window.mqtt):reject(Error('MQTT unavailable'));s.onerror=()=>{s.remove();reject(Error('MQTT unavailable'));};document.head.appendChild(s);}).catch(e=>{SIGNAL.loading=null;throw e;});return SIGNAL.loading;
 }
-function rtPublish(){
-  if(!RT.ready || !RT.dirty || RT.pending || RT.flight!==null) return;
-  RT.flight=RT.seq;
-  RT.ws.send(JSON.stringify({type:'publish',base:RT.revision,seq:RT.seq,words:S.words}));
-  rtStatus('正在发布改动…');
+function stopCloudSub(){if(SIGNAL.client)SIGNAL.client.end(true);SIGNAL.client=null;SIGNAL.identity='';clearTimeout(SIGNAL.timer);signalStatus('已关闭');}
+async function startCloudSub(){
+  if(!cloudOn() || !CLOUD.auto){stopCloudSub();return;}
+  const id=CLOUD.gistId+'|'+CLOUD.token;
+  if((SIGNAL.identity===id && SIGNAL.client) || SIGNAL.connecting)return;
+  stopCloudSub();SIGNAL.connecting=true;signalStatus('正在连接 MQTT…');
+  try{
+    const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('world-correct-v1|'+id));
+    const topic='world-correct/v1/'+Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
+    const mqtt=await mqttLibrary();
+    if(!cloudOn() || !CLOUD.auto || id!==CLOUD.gistId+'|'+CLOUD.token)return;
+    SIGNAL.identity=id;SIGNAL.topic=topic;
+    const client=mqtt.connect('wss://broker.emqx.io:8084/mqtt',{clean:true,reconnectPeriod:3000,connectTimeout:10000,keepalive:30});SIGNAL.client=client;
+    client.on('connect',()=>client.subscribe(topic,{qos:1},err=>{signalStatus(err?'订阅失败':'已连接 · 通知后立即拉取');if(!err)cloudSubTick();}));
+    client.on('message',(t,p)=>{if(t!==SIGNAL.topic || p.length>256)return;try{const m=JSON.parse(p.toString());if(m.type==='updated' && Number.isFinite(m.at) && m.at>0){SIGNAL.target=Math.max(SIGNAL.target,m.at);cloudSubTick();}}catch(e){}});
+    client.on('reconnect',()=>signalStatus('正在重连…'));
+    client.on('offline',()=>signalStatus('离线，本机数据已保存'));
+    client.on('error',()=>signalStatus('连接异常，回到前台仍会对齐'));
+  }catch(e){signalStatus('通知不可用，回到前台仍会对齐');}finally{SIGNAL.connecting=false;}
 }
-function rtApply(m){
-  if(!Array.isArray(m.words)) return;
-  const words=m.words.map(normalizeWord);
-  if(words.some(w=>!w)){rtStatus('同步内容格式不正确');return;}
-  S.words=words;
-  localStorage.setItem(KEY,JSON.stringify(words));
-  localStorage.setItem(META_KEY,JSON.stringify({updatedAt:m.updatedAt}));
-  updateCounts(); renderLib(); startRound(null);
-  if(S.tab==='game'){GAME.items=[];renderGameChips();gameShowGuide();renderGameIdle();}
-  rtStatus('已实时同步 · 版本 '+m.revision);
-}
-function rtConnect(){
-  clearTimeout(RT.timer);
-  const c=rtConfig(); if(!c.url || !c.secret) return;
-  if(RT.ws){RT.ws.onclose=null;RT.ws.close();}
-  RT.ready=false;RT.flight=null;
-  let ws;
-  try{ws=new WebSocket(c.url);}catch(e){rtStatus('同步地址无效');return;}
-  RT.ws=ws; rtStatus('正在连接实时同步…');
-  ws.onopen=()=>ws.send(JSON.stringify({type:'subscribe',secret:c.secret}));
-  ws.onmessage=e=>{
-    let m;try{m=JSON.parse(e.data);}catch(e){return;}
-    if(m.type==='ack'){
-      RT.revision=m.revision;RT.flight=null;
-      if(m.seq===RT.seq){RT.dirty=false;localStorage.removeItem(RT_OUT);}
-      rtStatus('实时同步已连接 · 版本 '+m.revision);rtPublish();return;
+function signalPublish(at){startCloudSub();if(SIGNAL.client?.connected)SIGNAL.client.publish(SIGNAL.topic,JSON.stringify({type:'updated',at}),{qos:1,retain:false});}
+async function cloudSubTick(attempt=0){
+  if(!cloudOn() || !CLOUD.auto || document.hidden || CLOUD.pending)return;
+  if(SIGNAL.pulling || CLOUD.busy || CLOUD.queued){clearTimeout(SIGNAL.timer);SIGNAL.timer=setTimeout(()=>cloudSubTick(),1800);return;}
+  SIGNAL.pulling=true;
+  try{
+    const remote=await cloudFetch();if(!remote || !Array.isArray(remote.words))return;
+    if(remote.updatedAt>(CLOUD.remoteAt||0)){
+      if(localAt()>(CLOUD.remoteAt||0) && !isPristineLocal())showCloudConflict(remote);
+      else{CLOUD.remoteAt=remote.updatedAt;cloudApplyRemote(remote,true);toast('已同步其他设备的改动');}
     }
-    if(m.type==='error'){RT.flight=null;rtStatus(m.message);return;}
-    if(m.type!=='snapshot' && m.type!=='conflict') return;
-    const previous=RT.revision; RT.revision=m.revision;RT.ready=true;RT.retry=0;
-    if(m.words===null){rtChanged();rtPublish();return;}
-    if(RT.dirty && JSON.stringify(S.words)===JSON.stringify(m.words)){
-      RT.dirty=false;RT.flight=null;localStorage.removeItem(RT_OUT);
-    }else if(RT.dirty){
-      if(m.type==='conflict' || m.revision!==previous){
-        RT.flight=null;RT.pending=m;$('rtConflict').hidden=false;
-        rtStatus('两台设备都有改动，请选择保留哪一份');return;
-      }
-      rtPublish();return;
-    }else rtApply(m);
-    rtStatus('实时同步已连接 · 版本 '+m.revision);
-  };
-  ws.onerror=()=>rtStatus('连接失败，数据已保存在本机');
-  ws.onclose=e=>{
-    RT.ready=false;RT.flight=null;
-    if(e.code===1008){rtStatus('同步口令无效，请检查配置');return;}
-    rtStatus('连接断开，正在重连…');
-    RT.timer=setTimeout(rtConnect,Math.min(30000,1000*2**Math.min(RT.retry++,5)));
-  };
+    if(remote.updatedAt<SIGNAL.target && attempt<3){clearTimeout(SIGNAL.timer);SIGNAL.timer=setTimeout(()=>cloudSubTick(attempt+1),1000*2**attempt);}
+  }catch(e){signalStatus('拉取失败，回到前台可重试');if(attempt<3){clearTimeout(SIGNAL.timer);SIGNAL.timer=setTimeout(()=>cloudSubTick(attempt+1),2000*2**attempt);}}
+  finally{SIGNAL.pulling=false;}
 }
-function rtInit(){
-  const section=document.createElement('section');section.className='card';
-  section.style.cssText='padding:16px;margin:12px 0';
-  section.innerHTML='<h3>实时同步 · Pub/Sub</h3><p>各设备填写相同地址与家庭口令。Gist 另作备份。</p><label>同步地址<input id="rtUrl" type="url" placeholder="wss://sync.example.com" style="width:100%;min-height:44px"></label><label>家庭口令<input id="rtSecret" type="password" autocomplete="off" style="width:100%;min-height:44px"></label><button class="btn" id="rtSave">连接实时同步</button><button class="btn" id="rtOff">断开</button><p id="rtStatus" role="status">尚未配置实时同步</p><div id="rtConflict" hidden><p>本机和云端都有改动，未自动覆盖。</p><button id="rtRemote" class="btn">使用云端</button><button id="rtLocal" class="btn">保留本机并发布</button></div>';
-  const host=$('cloudToken').closest('.modal') || $('cloudToken').parentElement.parentElement;
-  host.querySelector('.panel').insertBefore(section,host.querySelector('.cloud-state'));
-  const c=rtConfig();$('rtUrl').value=c.url||'';$('rtSecret').value=c.secret||'';
-  $('rtSave').onclick=()=>{
-    const url=$('rtUrl').value.trim(),secret=$('rtSecret').value.trim();
-    let u;try{u=new URL(url);}catch(e){toast('请填写有效的 WebSocket 地址');return;}
-    if(u.protocol!=='wss:' && !(u.protocol==='ws:' && ['localhost','127.0.0.1'].includes(u.hostname))){toast('请使用 wss:// 安全连接');return;}
-    if(secret.length<24){toast('家庭口令至少 24 个字符');return;}
-    localStorage.setItem(RT_KEY,JSON.stringify({url,secret}));RT.revision=0;RT.pending=null;$('rtConflict').hidden=true;rtConnect();
-  };
-  $('rtOff').onclick=()=>{localStorage.removeItem(RT_KEY);clearTimeout(RT.timer);if(RT.ws){RT.ws.onclose=null;RT.ws.close();}RT.ready=false;rtStatus('实时同步已断开');};
-  $('rtRemote').onclick=()=>{const m=RT.pending;RT.pending=null;RT.dirty=false;localStorage.removeItem(RT_OUT);$('rtConflict').hidden=true;rtApply(m);};
-  $('rtLocal').onclick=()=>{RT.pending=null;$('rtConflict').hidden=true;rtPublish();};
-  window.addEventListener('online',rtConnect);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden) rtConnect();});
-  rtConnect();
+function refreshSignalStatus(){signalStatus(SIGNAL.status);}
+function signalInit(){
+  const p=document.createElement('p');p.id='mqttStatus';p.setAttribute('role','status');p.style.cssText='padding:0 20px;font-size:13px';$('modalCloud').querySelector('.panel-head').after(p);refreshSignalStatus();
+  window.addEventListener('online',()=>{startCloudSub();cloudSubTick();});
 }
 
 function boot(){
@@ -13254,7 +13215,7 @@ function boot(){
   loadEngineMode();
   loadCloud();
   loadAi();
-  rtInit();
+  signalInit();
   updateCounts();
   initPad();
   bind();
@@ -13271,7 +13232,7 @@ function boot(){
   // 打开时比对一次云端备份（云端更新就弹窗问，不自动覆盖本地）
   setTimeout(cloudCheckOnOpen, 2200);
 
-  // WebSocket 订阅在 rtInit 中启动
+  // MQTT 订阅接收轻量更新通知
   startCloudSub();
 
   // 空闲时预装载手写识别数据（一次性约 200ms），第一次手写识别就不用等
