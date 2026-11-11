@@ -804,6 +804,116 @@ button{
   0%,100%{opacity:.3;transform:scale(.85);}
   50%{opacity:1;transform:scale(1);}
 }
+
+/* ============================================================
+   填词游戏（AI 出题 · 挖空填字）—— 紫色系与复习/录入明显区分
+   ============================================================ */
+:root{ --game:#7C5CE0; --game-l:#EFE9FC; }
+@media (prefers-color-scheme: dark){
+  :root{ --game:#A78BFA; --game-l:#241B3D; }
+}
+.game-card{position:relative;padding:24px;}
+.game-card::before{
+  content:'';position:absolute;left:0;right:0;top:0;height:4px;
+  background:linear-gradient(90deg,var(--game),var(--primary));
+  border-radius:var(--r-lg) var(--r-lg) 0 0;
+}
+.game-head{
+  display:flex;align-items:center;gap:9px;flex:none;
+  padding-bottom:10px;margin-bottom:14px;
+  border-bottom:1px solid var(--line);
+}
+.game-head-mark{width:4px;height:19px;border-radius:3px;background:var(--game);flex:none;}
+.game-head strong{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:.3px;}
+.game-head-sub{font-size:12px;color:var(--muted);margin-left:auto;}
+.game-head .chip{min-height:34px;flex:none;font-size:12px;}
+.game-guide{text-align:center;padding:36px 10px;}
+.game-guide h2{margin:12px 0 6px;font-size:20px;color:var(--ink);}
+.game-guide p{margin:0 auto;max-width:430px;color:var(--muted);font-size:14px;line-height:1.75;}
+.game-guide .big-ic .ic{width:44px;height:44px;color:var(--game);}
+.game-body{flex:1;min-height:0;display:flex;flex-direction:column;}
+.game-grid{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px;}
+.game-quest-col{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;}
+.game-pick{display:flex;flex-direction:column;gap:8px;flex:none;}
+.game-pick-label{font-size:12.5px;font-weight:700;color:var(--ink-2);letter-spacing:.3px;}
+.game-chips{
+  display:flex;flex-wrap:wrap;gap:8px;max-height:118px;overflow-y:auto;
+  align-content:flex-start;padding:2px;overscroll-behavior:contain;
+  scrollbar-width:thin;
+}
+.g-chip{
+  position:relative;min-width:46px;height:44px;padding:0 10px;border-radius:12px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:var(--font-cn);font-size:24px;line-height:1;
+  background:var(--surface);border:1.5px solid var(--line-2);color:var(--ink);
+  transition:transform .12s ease,border-color .12s ease;
+}
+.g-chip:active{transform:scale(.93);}
+.g-chip.on{border-color:var(--game);color:var(--game);font-weight:700;box-shadow:0 0 0 3px var(--game-l);}
+.g-chip.cached::after{
+  content:'';position:absolute;top:6px;right:6px;
+  width:5px;height:5px;border-radius:50%;background:var(--game);opacity:.75;
+}
+.game-quest{
+  flex:1;min-height:180px;overflow-y:auto;overscroll-behavior:contain;
+  border:1.5px dashed var(--line-2);border-radius:16px;
+  background:var(--paper);padding:18px 20px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.gq-loading{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;flex:1;min-height:140px;
+  color:var(--muted);font-size:14px;text-align:center;line-height:1.7;
+}
+.gq-spin{
+  width:26px;height:26px;border-radius:50%;flex:none;
+  border:3px solid var(--line-2);border-top-color:var(--game);
+  animation:gqSpin 1s linear infinite;
+}
+@keyframes gqSpin{to{transform:rotate(360deg);}}
+.gq-type{
+  display:inline-flex;align-items:center;align-self:flex-start;
+  font-size:12px;font-weight:800;letter-spacing:1.5px;
+  color:var(--game);background:var(--game-l);
+  border-radius:9px;padding:4px 11px;flex:none;
+}
+.gq-text{
+  font-family:var(--font-cn);color:var(--ink);
+  font-size:clamp(24px,3vw,34px);line-height:1.8;letter-spacing:2px;
+  overflow-wrap:break-word;user-select:none;-webkit-user-select:none;
+}
+.gq-text.is-sent{font-size:clamp(18px,1.9vw,24px);letter-spacing:1px;line-height:1.9;}
+.g-blank{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:1.35em;height:1.35em;margin:0 .1em;vertical-align:-.25em;
+  border:2px dashed var(--game);border-radius:.28em;
+  color:var(--game);font-weight:700;font-family:var(--font-cn);
+  background:var(--game-l);
+}
+.g-blank.ok{border-style:solid;border-color:var(--primary);background:var(--primary-l);color:var(--primary);}
+.g-blank.hint{border-style:solid;border-color:var(--amber);background:transparent;color:var(--amber);}
+.gq-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none;margin-top:auto;}
+.gq-prog{display:flex;gap:6px;align-items:center;}
+.gq-prog i{width:9px;height:9px;border-radius:50%;background:var(--line-2);}
+.gq-prog i.cur{background:var(--game);transform:scale(1.3);}
+.gq-prog i.ok{background:var(--primary);}
+.gq-count{font-size:12.5px;color:var(--muted);font-weight:600;}
+.gq-done{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;flex:1;justify-content:center;min-height:140px;}
+.gq-done .ic{width:40px;height:40px;color:var(--game);}
+.gq-done h3{margin:0;font-size:20px;color:var(--ink);}
+.gq-done p{margin:0;color:var(--muted);font-size:14px;}
+.game-write-col{display:flex;flex-direction:column;align-items:center;gap:10px;min-width:0;min-height:0;}
+.game-write-col .tian-wrap{width:100%;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;}
+.game-tian{width:min(var(--pad-entry),100%);border-style:dashed;background:#fffdf5;}
+@media (prefers-color-scheme: dark){ .game-tian{background:var(--paper);} }
+#gamePadCanvas{
+  position:absolute;inset:3px;
+  width:calc(100% - 6px);height:calc(100% - 6px);
+  border-radius:10px;touch-action:none;
+  -webkit-user-select:none;user-select:none;
+  z-index:3;cursor:crosshair;
+}
+.game-tools{display:flex;gap:8px;flex:none;flex-wrap:wrap;justify-content:center;}
 .input,.textarea{
   width:100%;
   min-height:50px;padding:12px 14px;
