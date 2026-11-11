@@ -11781,7 +11781,8 @@ function renderGameQuest(){
   GAME.states.forEach(function(s, k){
     dots += '<i class="' + (s === 'ok' ? 'ok' : (k === GAME.idx ? 'cur' : '')) + '"></i>';
   });
-  const py = pyOf(GAME.char);
+  const w = S.words.filter(function(x){ return x.char === GAME.char; })[0];
+  const py = (w && w.pinyin) || pyOf(GAME.char, (w && w.words) || []);
   q.innerHTML =
     '<div class="gq-type">' + (item.type === 'idiom' ? '成语填空' : '句子填空') + '</div>' +
     '<div class="gq-text' + (item.type === 'sentence' ? ' is-sent' : '') + '">' + questHtml(item, st, GAME.char) + '</div>' +
