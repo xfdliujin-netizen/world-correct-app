@@ -19,7 +19,7 @@ async function startCloudSub(){
     if(!cloudOn() || !CLOUD.auto || id!==CLOUD.gistId+'|'+CLOUD.token)return;
     SIGNAL.identity=id;SIGNAL.topic=topic;
     const client=mqtt.connect('wss://broker.emqx.io:8084/mqtt',{clean:true,reconnectPeriod:3000,connectTimeout:10000,keepalive:30});SIGNAL.client=client;
-    client.on('connect',()=>client.subscribe(topic,{qos:1},err=>{signalStatus(err?'订阅失败':'已连接 · 通知后立即拉取');if(!err)cloudSubTick();}));
+    client.on('connect',()=>client.subscribe(topic,{qos:1},err=>{signalStatus(err?'订阅失败':'已连接 · 通知后立即拉取');if(!err){if(CLOUD.remoteAt)signalPublish(CLOUD.remoteAt);cloudSubTick();}}));
     client.on('message',(t,p)=>{if(t!==SIGNAL.topic || p.length>256)return;try{const m=JSON.parse(p.toString());if(m.type==='updated' && Number.isFinite(m.at) && m.at>0){SIGNAL.target=Math.max(SIGNAL.target,m.at);cloudSubTick();}}catch(e){}});
     client.on('reconnect',()=>signalStatus('正在重连…'));
     client.on('offline',()=>signalStatus('离线，本机数据已保存'));
@@ -36,7 +36,7 @@ async function cloudSubTick(attempt=0){
     if(remote.updatedAt>(CLOUD.remoteAt||0)){
       if(localAt()>(CLOUD.remoteAt||0) && !isPristineLocal())showCloudConflict(remote);
       else{CLOUD.remoteAt=remote.updatedAt;cloudApplyRemote(remote,true);toast('已同步其他设备的改动');}
-    }
+    }else if(localAt()>remote.updatedAt){cloudSyncSoon(0);}
     if(remote.updatedAt<SIGNAL.target && attempt<3){clearTimeout(SIGNAL.timer);SIGNAL.timer=setTimeout(()=>cloudSubTick(attempt+1),1000*2**attempt);}
   }catch(e){signalStatus('拉取失败，回到前台可重试');if(attempt<3){clearTimeout(SIGNAL.timer);SIGNAL.timer=setTimeout(()=>cloudSubTick(attempt+1),2000*2**attempt);}}
   finally{SIGNAL.pulling=false;}

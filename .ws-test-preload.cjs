@@ -1,1 +1,0 @@
-const M=require('module'),load=M._load;M._load=function(id,...args){if(id==='ws'){const b=require('C:/Users/Lenovo/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/lib/utilsBundle.js');return {WebSocketServer:b.wsServer,WebSocket:b.ws};}return load.call(this,id,...args);};

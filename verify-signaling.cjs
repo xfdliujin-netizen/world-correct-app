@@ -9,7 +9,7 @@ vm.runInContext(fs.readFileSync('realtime-client.js','utf8'),ctx);
 (async()=>{
  await vm.runInContext('startCloudSub()',ctx);handlers.connect();await new Promise(r=>setImmediate(r));
  assert.equal(fetched,1);assert.equal(applied,1);
- vm.runInContext('signalPublish(25)',ctx);assert.deepEqual(JSON.parse(sent[0][1]),{type:'updated',at:25});
+ vm.runInContext('signalPublish(25)',ctx);assert.deepEqual(JSON.parse(sent.at(-1)[1]),{type:'updated',at:25});
  assert.ok(!sent[0][0].includes('test-token'));assert.equal(sent[0][2].retain,false);
  ctx.CLOUD.remoteAt=10;ctx.localAt=()=>15;
  await vm.runInContext('cloudSubTick()',ctx);assert.equal(conflicts,1);
