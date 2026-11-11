@@ -2228,7 +2228,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
           <div id="gameGuide" class="game-guide hidden">
             <div class="big-ic"><svg class="ic"><use href="#i-game"/></svg></div>
             <h2 id="gameGuideTitle">先连接 AI，才能自动出题</h2>
-            <p id="gameGuideText">填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个句子，把生字挖空，让你手写填字。</p>
+            <p id="gameGuideText">填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个词语、3 个成语和 3 个句子，把生字挖空，让你手写填字。</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px">
               <button class="btn btn-primary" id="gameGuideBtn1">配置 DeepSeek</button>
               <button class="btn btn-soft" data-goto="entry">去录入生字</button>
@@ -11546,11 +11546,11 @@ function restore(){
 
 /* ============================================================
    10.4 填词游戏（AI 出题 · 挖空填字）
-   —— 根据录入的生字，用 DeepSeek 生成 3 个成语 + 3 个句子，
+   —— 根据录入的生字，用 DeepSeek 生成 3 个词语 + 3 个成语 + 3 个句子，
       把生字挖空，手写填对才算过关；题目按字缓存在本机，不重复花钱。
    ============================================================ */
 const AI_STORE  = 'hanzi.ai.v1';      // { key } —— DeepSeek API Key，只存本机
-const GAME_STORE = 'hanzi.game.v1';   // { 字: {i:[成语], s:[句子], at:时间} }
+const GAME_STORE = 'hanzi.game.v2';   // { 字: {i:[成语], s:[句子], at:时间} }
 const AI = { key:'' };
 const GAME = {
   pad:null,                 // 游戏专属手写板（与录入板相互独立）
@@ -11578,11 +11578,13 @@ function gameCacheGet(ch){
   const i = (c.i || []).filter(function(s){ return typeof s === 'string' && s.indexOf(ch) >= 0; });
   const s = (c.s || []).filter(function(t){ return typeof t === 'string' && t.indexOf(ch) >= 0; });
   if(i.length !== 3 || s.length !== 3 || new Set(i).size !== 3 || new Set(s).size !== 3) return null;
-  return { idioms: i, sentences: s };
+  const words=(c.w||[]).filter(t=>typeof t==='string' && t.includes(ch) && t.length>=2 && t.length<=4);
+  if(words.length!==3) return null;
+  return { words, idioms: i, sentences: s };
 }
-function gameCacheSet(ch, idioms, sentences){
+function gameCacheSet(ch, idioms, sentences, words){
   const all = gameCacheAll();
-  all[ch] = { i: idioms, s: sentences, at: Date.now() };
+  all[ch] = { w:words, i: idioms, s: sentences, at: Date.now() };
   const keys = Object.keys(all);
   if(keys.length > 60){
     keys.sort(function(a, b){ return (all[a].at || 0) - (all[b].at || 0); });
@@ -11631,6 +11633,7 @@ async function aiGenFor(ch, retry){
   const sys = '你是一位资深语文老师，为小学生设计硬笔书法练习素材。你的回答永远是一个严格的 JSON 对象，不含任何其他文字。';
   const user =
     '请为生字「' + ch + '」生成练习素材：\n' +
+    '0. 3 个包含「' + ch + '」字的常用词语（2～4 字）；\n' +
     '1. 3 个包含「' + ch + '」字的成语；\n' +
     '2. 3 个包含「' + ch + '」字的句子。\n' +
     '要求：\n' +
@@ -11638,25 +11641,26 @@ async function aiGenFor(ch, retry){
     '- 句意优美、积极向上，带有画面感，兼具科普或文学色彩（避免干巴巴的口号）；\n' +
     '- 句子长度适中（15～30 字），适合作为硬笔书法练习的范本；\n' +
     '- 成语选常见、用法规范的，不要生造。\n' +
-    '只输出 JSON：{"idioms":["","",""],"sentences":["","",""]}';
+    '只输出 JSON：{"words":["","",""],"idioms":["","",""],"sentences":["","",""]}';
   const txt = await deepseekChat(sys, retry
     ? '注意：上一次的结果里有不包含「' + ch + '」字的条目，请严格自查每一项都必须完整包含「' + ch + '」这个字。\n' + user
     : user);
   const j = parseAiJson(txt);
-  if(!j || !Array.isArray(j.idioms) || !Array.isArray(j.sentences)) throw new Error('AI 返回的格式不对');
+  if(!j || !Array.isArray(j.words) || !Array.isArray(j.idioms) || !Array.isArray(j.sentences)) throw new Error('AI 返回的格式不对');
   const idioms = Array.from(new Set(j.idioms.filter(s=>typeof s==='string').map(s=>s.trim())))
     .filter(function(s){ return s.indexOf(ch) >= 0 && s.length === 4; });
   const sentences = Array.from(new Set(j.sentences.filter(s=>typeof s==='string').map(s=>s.trim())))
     .filter(function(s){ return s.indexOf(ch) >= 0 && s.replace(/[^\u3400-\u9fff]/g,'').length >= 15 && s.replace(/[^\u3400-\u9fff]/g,'').length <= 30; });
-  return { idioms: idioms.slice(0, 3), sentences: sentences.slice(0, 3) };
+  const words=Array.from(new Set(j.words.filter(t=>typeof t==='string').map(t=>t.trim()))).filter(t=>t.includes(ch) && t.length>=2 && t.length<=4).slice(0,3);
+  return { words, idioms: idioms.slice(0, 3), sentences: sentences.slice(0, 3) };
 }
 
 async function aiGen(ch){
   let r = await aiGenFor(ch, false);
-  if(r.idioms.length !== 3 || r.sentences.length !== 3){
+  if(r.words.length !== 3 || r.idioms.length !== 3 || r.sentences.length !== 3){
     r = await aiGenFor(ch, true);      // 有不达标条目 → 提醒模型自查重试一次
   }
-  if(r.idioms.length !== 3 || r.sentences.length !== 3) throw new Error('未能生成 3 个规范成语和 3 个合格句子。该字可能没有足够的常见成语，请换字或重试；不会用生造成语凑数。');
+  if(r.words.length !== 3 || r.idioms.length !== 3 || r.sentences.length !== 3) throw new Error('未能生成 3 个规范成语和 3 个合格句子。该字可能没有足够的常见成语，请换字或重试；不会用生造成语凑数。');
   return r;
 }
 
@@ -11702,7 +11706,7 @@ function gameShowGuide(){
   guide.classList.remove('hidden'); body.classList.add('hidden');
   $('gameGuideTitle').textContent = !AI.key ? '先连接 AI，才能自动出题' : '字库里还没有生字';
   $('gameGuideText').textContent = !AI.key
-    ? '填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个优美句子，把生字挖空，让你手写填字。'
+    ? '填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个词语、3 个成语和 3 个优美句子，把生字挖空，让你手写填字。'
     : '先去「录入」添加几个生字，再回来玩填词游戏。';
   $('gameGuideBtn1').classList.toggle('hidden', !!AI.key);
   return false;
@@ -11720,7 +11724,7 @@ async function startGame(ch, force){
     renderGameLoading(ch);
     try{
       data = await aiGen(ch);
-      gameCacheSet(ch, data.idioms, data.sentences);
+      gameCacheSet(ch, data.idioms, data.sentences, data.words);
       renderGameChips();
     }catch(e){
       GAME.busy = false; GAME.pendingChar = '';
@@ -11732,6 +11736,7 @@ async function startGame(ch, force){
   }
 
   GAME.items = [];
+  data.words.forEach(function(t){ GAME.items.push({type:'word',text:t}); });
   data.idioms.forEach(function(t){ GAME.items.push({ type: 'idiom', text: t }); });
   data.sentences.forEach(function(t){ GAME.items.push({ type: 'sentence', text: t }); });
   GAME.idx = 0;
@@ -11743,7 +11748,7 @@ async function startGame(ch, force){
 function renderGameLoading(ch){
   $('gameQuest').innerHTML =
     '<div class="gq-loading"><span class="gq-spin"></span>' +
-    '<span>正在请 AI 为「' + escHtml(ch) + '」出题：3 个成语 + 3 个句子…<br>第一次约需十几秒，之后这个字会缓存起来</span></div>';
+    '<span>正在请 AI 为「' + escHtml(ch) + '」出题：3 个词语 + 3 个成语 + 3 个句子…<br>第一次约需十几秒，之后这个字会缓存起来</span></div>';
   resetGameInput();
 }
 
@@ -11768,7 +11773,7 @@ function renderGameIdle(){
   $('gameQuest').innerHTML =
     '<div class="gq-loading">' +
       '<svg class="ic" style="width:34px;height:34px;color:var(--game)"><use href="#i-game"/></svg>' +
-      '<span>点上面的生字开始 —— AI 会生成 3 个成语和 3 个句子，<br>把生字挖空，用手写板写对才算过关</span>' +
+      '<span>点上面的生字开始 —— AI 会生成 3 个词语、3 个成语和 3 个句子，<br>把生字挖空，用手写板写对才算过关</span>' +
     '</div>';
   resetGameInput();
   $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>先选一个生字</span>';
@@ -11776,14 +11781,9 @@ function renderGameIdle(){
 
 /* 把目标字挖空显示；答对变绿，看过提示变琥珀色 */
 function questHtml(item, state, ch){
-  const t = item.text;
-  const i = t.indexOf(ch);
-  if(i < 0) return escHtml(t);
   const cls = state === 'ok' ? 'g-blank ok' : (GAME.hintOn ? 'g-blank hint' : 'g-blank');
-  const inner = (state === 'ok' || GAME.hintOn) ? ch : '?';
-  return escHtml(t.slice(0, i)) +
-    '<span class="' + cls + '">' + escHtml(inner) + '</span>' +
-    escHtml(t.slice(i + 1));
+  const inner = (state === 'ok' || GAME.hintOn) ? ch : '　';
+  return item.text.split(ch).map(escHtml).join('<span class="'+cls+'" aria-label="待填写的生字">'+escHtml(inner)+'</span>');
 }
 
 function renderGameQuest(){
@@ -11798,16 +11798,23 @@ function renderGameQuest(){
   const w = S.words.filter(function(x){ return x.char === GAME.char; })[0];
   const py = (w && w.pinyin) || pyOf(GAME.char, (w && w.words) || []);
   q.innerHTML =
-    '<div class="gq-type">' + (item.type === 'idiom' ? '成语填空' : '句子填空') + '</div>' +
+    '<div class="gq-type">' + (item.type === 'word' ? '词语填空' : item.type === 'idiom' ? '成语填空' : '佳句填空') + '</div>' +
     '<div class="gq-text' + (item.type === 'sentence' ? ' is-sent' : '') + '">' + questHtml(item, st, GAME.char) + '</div>' +
     '<div class="gq-foot">' +
       '<span class="gq-prog">' + dots + '</span>' +
       '<span class="gq-count">第 ' + (GAME.idx + 1) + ' / ' + GAME.items.length + ' 题' +
       (py ? ' · 这个字读「' + escHtml(py) + '」' : '') + '</span>' +
     '</div>';
+  if(st !== 'ok' && st !== 'skip'){
+    const form=document.createElement('form');form.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+    form.innerHTML='<input aria-label="填写空缺的生字" class="input" maxlength="1" placeholder="填入生字" style="width:110px;min-height:44px"><button class="btn btn-primary" type="submit">检查答案</button>';
+    form.onsubmit=function(e){e.preventDefault();if(form.querySelector('input').value.trim()===GAME.char)gameAnswerOk();else toast('再读一遍，想想空格里该填哪个字');};q.appendChild(form);
+  }else{
+    const next=document.createElement('button');next.className='btn btn-primary';next.textContent='读一读，下一题';next.onclick=gameNext;q.appendChild(next);
+  }
   resetGameInput();
   $('gameHint').innerHTML =
-    '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>在格子里写出去掉的「' + escHtml(GAME.char) + '」</span>';
+    '<svg class="ic ic-sm"><use href="#i-pen"/></svg><span>根据上下文，补全空格里的生字</span>';
 }
 
 function renderGameDone(){
@@ -11816,8 +11823,9 @@ function renderGameDone(){
   $('gameQuest').innerHTML =
     '<div class="gq-done">' +
       '<svg class="ic"><use href="#i-award"/></svg>' +
-      '<h3>「' + escHtml(GAME.char) + '」过关！</h3>' +
+      '<h3>本轮练习完成</h3>' +
       '<p>写对 ' + ok + ' / ' + GAME.items.length + ' 题' + (skip ? ' · 跳过 ' + skip + ' 题' : '') + '</p>' +
+      '<div style="text-align:left;line-height:1.8"><b>好词好句积累 · 再读一遍</b>' + GAME.items.map(function(item){return '<p>'+escHtml(item.text)+'</p>';}).join('') + '</div>' +
       '<div class="gq-foot" style="justify-content:center;margin-top:4px">' +
         '<button class="btn btn-soft" id="gqAgain" type="button">重新出题再练</button>' +
         '<button class="btn btn-primary" id="gqNext" type="button">换个生字</button>' +
@@ -11909,16 +11917,10 @@ function gameAnswerOk(){
   renderGameQuest();                 // 空格里亮出正确答案（绿色），并清空手写板
   $('gameHint').innerHTML =
     '<svg class="ic ic-sm" style="color:var(--primary)"><use href="#i-check"/></svg><span>写对了！</span>';
-  setTimeout(function(){
-    if(GAME.states[GAME.idx] !== 'ok') return;      // 状态被重置就不动
-    if(GAME.idx >= GAME.items.length - 1){
-      renderGameDone();
-    }else{
-      GAME.idx++;
-      GAME.hintOn = false;
-      renderGameQuest();
-    }
-  }, 900);
+}
+function gameNext(){
+  if(GAME.idx>=GAME.items.length-1){renderGameDone();return;}
+  GAME.idx++;GAME.hintOn=false;renderGameQuest();
 }
 
 function gameHintShow(){
@@ -11936,16 +11938,6 @@ function gameSkip(){
   GAME.hintOn = true;                // 跳过也把答案亮出来，看一眼
   renderGameQuest();
   $('gameHint').innerHTML = '<svg class="ic ic-sm"><use href="#i-right"/></svg><span>跳过这一题，看一眼答案</span>';
-  setTimeout(function(){
-    if(GAME.states[GAME.idx] !== 'skip') return;
-    if(GAME.idx >= GAME.items.length - 1){
-      renderGameDone();
-    }else{
-      GAME.idx++;
-      GAME.hintOn = false;
-      renderGameQuest();
-    }
-  }, 900);
 }
 
 /* ---------- AI 设置弹窗 ---------- */
@@ -13233,7 +13225,7 @@ function rtInit(){
   section.style.cssText='padding:16px;margin:12px 0';
   section.innerHTML='<h3>实时同步 · Pub/Sub</h3><p>各设备填写相同地址与家庭口令。Gist 另作备份。</p><label>同步地址<input id="rtUrl" type="url" placeholder="wss://sync.example.com" style="width:100%;min-height:44px"></label><label>家庭口令<input id="rtSecret" type="password" autocomplete="off" style="width:100%;min-height:44px"></label><button class="btn" id="rtSave">连接实时同步</button><button class="btn" id="rtOff">断开</button><p id="rtStatus" role="status">尚未配置实时同步</p><div id="rtConflict" hidden><p>本机和云端都有改动，未自动覆盖。</p><button id="rtRemote" class="btn">使用云端</button><button id="rtLocal" class="btn">保留本机并发布</button></div>';
   const host=$('cloudToken').closest('.modal') || $('cloudToken').parentElement.parentElement;
-  (host.querySelector('.modal-body') || $('cloudToken').parentElement.parentElement).prepend(section);
+  host.querySelector('.panel').insertBefore(section,host.querySelector('.cloud-state'));
   const c=rtConfig();$('rtUrl').value=c.url||'';$('rtSecret').value=c.secret||'';
   $('rtSave').onclick=()=>{
     const url=$('rtUrl').value.trim(),secret=$('rtSecret').value.trim();
