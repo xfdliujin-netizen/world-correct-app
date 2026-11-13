@@ -994,30 +994,6 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 }
 .lib-card.pressing{transform:scale(.965);border-color:var(--primary);}
 
-/* --- 字卡长按操作面板 --- */
-.panel.sheet{max-width:400px;padding:12px;gap:8px;}
-.sheet-head{
-  display:flex;align-items:baseline;gap:9px;
-  padding:4px 8px 12px;margin-bottom:4px;
-  border-bottom:1px solid var(--line);
-}
-.sheet-char{font-size:26px;font-weight:800;line-height:1;font-family:var(--font-cn);color:var(--ink);}
-.sheet-py{font-size:14px;color:var(--primary);font-family:"Iowan Old Style",Georgia,serif;}
-.sheet-hint{margin-left:auto;font-size:11.5px;color:var(--muted);}
-.sheet-item{
-  display:flex;align-items:center;gap:10px;width:100%;
-  min-height:50px;padding:0 14px;border-radius:13px;
-  background:var(--surface-2);border:1px solid var(--line);
-  font-size:15px;font-weight:600;color:var(--ink);text-align:left;
-  transition:transform .12s ease;
-}
-.sheet-item:active{transform:scale(.985);}
-.sheet-item .ic{opacity:.75;}
-.sheet-item.danger{color:var(--red);border-color:rgba(216,67,63,.22);background:rgba(216,67,63,.06);}
-.sheet-item.cancel{
-  justify-content:center;background:transparent;border-color:transparent;
-  color:var(--muted);font-weight:500;
-}
 .lib-card:active{transform:scale(.97);}
 @media (hover:hover){ .lib-card:hover{border-color:var(--primary);} }
 /* 拼音居中在汉字上方（放大一点），汉字居中 */
@@ -2298,6 +2274,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
             <span id="btnSelectText">选择</span>
           </button>
 
+          <button class="chip" id="btnDeleteWords" type="button"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
           <button class="chip" id="btnImport">
             <svg class="ic"><use href="#i-download"/></svg>
             <span>导入 / 导出</span>
@@ -2315,6 +2292,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
             </button>
           </div>
           <div class="sel-acts">
+            <button class="btn btn-primary btn-sm" id="btnSelPractice" type="button">成组练习</button>
             <button class="btn btn-ghost btn-sm" id="btnSelMaster" type="button">
               <svg class="ic ic-sm"><use href="#i-check"/></svg>转为已掌握
             </button>
@@ -2512,28 +2490,6 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
       <button class="btn btn-soft btn-sm" id="dToggle">标为已掌握</button>
       <button class="btn btn-primary btn-sm" id="dPractice">单字练习</button>
     </div>
-  </div>
-</div>
-
-<!-- ============ 弹窗：字卡长按操作 ============ -->
-<div class="modal" id="modalCard">
-  <div class="backdrop" data-close></div>
-  <div class="panel sheet">
-    <div class="sheet-head">
-      <span class="sheet-char" id="shChar">拔</span>
-      <span class="sheet-py" id="shPy">bá</span>
-      <span class="sheet-hint">长按字卡</span>
-    </div>
-    <button class="sheet-item" id="shPractice">
-      <svg class="ic ic-sm"><use href="#i-pen"/></svg>单字练习
-    </button>
-    <button class="sheet-item" id="shToggle">
-      <svg class="ic ic-sm"><use href="#i-check"/></svg><span id="shToggleText">标为已掌握</span>
-    </button>
-    <button class="sheet-item danger" id="shDelete">
-      <svg class="ic ic-sm"><use href="#i-trash"/></svg>删除这个字
-    </button>
-    <button class="sheet-item cancel" data-close>取消</button>
   </div>
 </div>
 
@@ -9456,8 +9412,8 @@ function shuffle(arr){
   return a;
 }
 
-function startRound(focusChar){
-  const pool = S.words.filter(function(w){ return !w.mastered; }).map(function(w){ return w.char; });
+function startRound(focusChar, selectedChars){
+  const pool = S.words.filter(function(w){ return selectedChars ? selectedChars.includes(w.char) : !w.mastered; }).map(function(w){ return w.char; });
 
   $('reviewSummary').classList.add('hidden');
 
@@ -9475,7 +9431,7 @@ function startRound(focusChar){
     q = [focusChar].concat(q.filter(function(c){ return c !== focusChar; }));
   }
 
-  S.queue = q.slice(0, Math.min(S.roundSize, q.length));
+  S.queue = selectedChars ? q : q.slice(0, Math.min(S.roundSize, q.length));
   S.idx = 0;
   S.done = {};
   S.newly = new Set();
@@ -11267,7 +11223,6 @@ function renderLib(){
 
   if(!list.length){
     grid.innerHTML = '<div class="empty-list">这个分类下还没有生字</div>';
-    if(S.selMode){ S.selMode = false; S.sel.clear(); }
     syncSelUI();
     return;
   }
@@ -11318,19 +11273,20 @@ function syncSelUI(){
   const f = S.libFilter;
   const m = $('btnSelMaster'), u = $('btnSelUnmaster');
   if(m){
-    m.hidden = (f === 'mastered');
-    m.disabled = empty;
+    m.hidden = false;
+    m.disabled = !S.words.some(function(w){ return S.sel.has(w.char) && !w.mastered; });
     m.classList.toggle('btn-primary', f !== 'mastered');
     m.classList.toggle('btn-ghost', f === 'mastered');
   }
   if(u){
-    u.hidden = (f === 'learning');
-    u.disabled = empty;
+    u.hidden = false;
+    u.disabled = !S.words.some(function(w){ return S.sel.has(w.char) && w.mastered; });
     u.classList.toggle('btn-primary', f === 'mastered');
     u.classList.toggle('btn-ghost', f !== 'mastered');
   }
   const d = $('btnSelDelete');
   if(d) d.disabled = empty;
+  $('btnSelPractice').disabled = empty;
 }
 
 function setSelMode(on){
@@ -11355,7 +11311,7 @@ function toggleSelCard(card){
 
 function setLibFilter(f){
   S.libFilter = f;
-  if(S.selMode) S.sel.clear();
+  
   ['learning','mastered','all'].forEach(function(k){
     const btn = $('libTab' + k.charAt(0).toUpperCase() + k.slice(1));
     if(btn) btn.classList.toggle('active', k === f);
@@ -12585,7 +12541,7 @@ function bindModalScrollGuard(){
 /* ============================================================
    12. Tab 切换
    ============================================================ */
-function switchTab(tab, focusChar){
+function switchTab(tab, focusChar, selectedChars){
   if(tab !== 'library' && S.selMode){ S.selMode = false; S.sel.clear(); syncSelUI(); }
   S.tab = tab;
 
@@ -12616,7 +12572,9 @@ function switchTab(tab, focusChar){
   }
 
   if(tab === 'review'){
-    if(!S.queue.length || S.queue.length === 0){
+    if(selectedChars){
+      startRound(null, selectedChars);
+    }else if(!S.queue.length || S.queue.length === 0){
       startRound(focusChar || null);
     }else if(focusChar){
       startRound(focusChar);
@@ -12645,18 +12603,6 @@ function switchTab(tab, focusChar){
    13. 事件绑定
    ============================================================ */
 let suppressCardClick = false;
-
-function openCardSheet(ch){
-  const item = S.words.filter(function(w){ return w.char === ch; })[0];
-  if(!item) return;
-  S.sheetChar = ch;
-  $('shChar').textContent = ch;
-  $('shPy').textContent = item.pinyin || pyOf(ch, item.words) || '';
-  $('shToggleText').textContent = item.mastered ? '移回待复习' : '标为已掌握';
-  const use = $('shToggle').querySelector('use');
-  if(use) use.setAttribute('href', item.mastered ? '#i-undo' : '#i-check');
-  openModal('modalCard');
-}
 
 function bind(){
   // Tab
@@ -12836,24 +12782,31 @@ function bind(){
   $('libTabAll').addEventListener('click', function(){ setLibFilter('all'); });
   $('libSearch').addEventListener('input', function(){
     S.libQuery = this.value || '';
-    if(S.selMode) S.sel.clear();
+    
     renderLib();
   });
   $('libGrid').addEventListener('click', function(e){
-    if(suppressCardClick){ suppressCardClick = false; return; }   // 长按已弹出面板，忽略随后的点击
+    if(suppressCardClick){ suppressCardClick = false; return; }   // 长按已选中，忽略随后的点击
     const card = e.target.closest('[data-detail]');
     if(!card) return;
     if(S.selMode){ toggleSelCard(card); return; }                  // 多选：点一下勾上/取消
     openDetail(card.dataset.detail);
   });
 
+  $('btnDeleteWords').addEventListener('click', function(){
+    if(!S.selMode) setSelMode(true);
+    toast('选中字卡后，点击下方删除按钮');
+  });
+  $('btnSelPractice').addEventListener('click', function(){
+    if(!S.sel.size) return;
+    switchTab('review', null, Array.from(S.sel));
+  });
   // 多选：进出、全选、批量掌握、批量删除
   $('btnSelect').addEventListener('click', function(){ setSelMode(!S.selMode); });
   $('btnSelAll').addEventListener('click', function(){
     const list = filteredWords();
     const allOn = list.length > 0 && list.every(function(w){ return S.sel.has(w.char); });
-    S.sel.clear();
-    if(!allOn) list.forEach(function(w){ S.sel.add(w.char); });
+    list.forEach(function(w){ if(allOn) S.sel.delete(w.char); else S.sel.add(w.char); });
     renderLib();
   });
   $('btnSelMaster').addEventListener('click', function(){
@@ -12889,7 +12842,7 @@ function bind(){
     toast('已删除 ' + n + ' 个字');
   });
 
-  // 长按字卡 → 操作面板（删除 / 掌握 / 练习）
+  // 长按字卡 → 进入选择并选中当前字
   let pressTimer = null, pressChar = null, pressMoved = false, pressEl = null;
 
   const pressCancel = function(){
@@ -12900,11 +12853,9 @@ function bind(){
   };
 
   const pressStart = function(e, x, y){
-    if(S.selMode) return;                     // 多选模式下长按不弹面板，避免和勾选冲突
     const card = e.target.closest('[data-detail]');
     if(!card) return;
-    // 面板没开时，新的一次按下就是干净状态，清掉上次的点击抑制
-    if(!$('modalCard').classList.contains('open')) suppressCardClick = false;
+    suppressCardClick = false;
     pressCancel();
     pressChar = card.getAttribute('data-detail');
     pressMoved = false;
@@ -12916,7 +12867,9 @@ function bind(){
       if(pressEl) pressEl.classList.remove('pressing');
       suppressCardClick = true;
       try{ if(navigator.vibrate) navigator.vibrate(12); }catch(err){}
-      openCardSheet(pressChar);
+      S.selMode = true;
+      S.sel.add(pressChar);
+      renderLib();
     }, 480);
   };
 
@@ -12954,35 +12907,6 @@ function bind(){
   window.addEventListener('mouseup', function(){
     clearTimeout(pressTimer); pressTimer = null;
     if(pressEl){ pressEl.classList.remove('pressing'); pressEl = null; }
-  });
-
-  // 面板动作
-  $('shPractice').addEventListener('click', function(){
-    const ch = S.sheetChar;
-    closeModal('modalCard');
-    if(ch) switchTab('review', ch);
-  });
-  $('shToggle').addEventListener('click', function(){
-    const ch = S.sheetChar;
-    const item = S.words.filter(function(w){ return w.char === ch; })[0];
-    if(!item) return;
-    if(item.mastered){ item.mastered = false; item.count = 0; }
-    else{ item.mastered = true; item.count = 3; }
-    save();
-    renderLib();
-    closeModal('modalCard');
-    toast(item.mastered ? '「' + ch + '」已归入已掌握' : '「' + ch + '」已移回待复习');
-  });
-  $('shDelete').addEventListener('click', function(){
-    const ch = S.sheetChar;
-    if(!ch) return;
-    if(!confirm('确定要删除「' + ch + '」吗？')) return;
-    S.words = S.words.filter(function(w){ return w.char !== ch; });
-    S.queue = S.queue.filter(function(c){ return c !== ch; });
-    save();
-    renderLib();
-    closeModal('modalCard');
-    toast('已删除「' + ch + '」');
   });
 
   // 导入导出
