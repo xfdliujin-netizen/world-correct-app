@@ -1646,10 +1646,6 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 
   /* ---------- 弹窗 / 详情 / 语音 ---------- */
   .panel-head h3{font-size:clamp(19px, 1.7vw, 22px);}
-  .sheet-char{font-size:34px;}
-  .sheet-py{font-size:17px;}
-  .sheet-hint{font-size:13.5px;}
-  .sheet-item{min-height:58px;font-size:clamp(16.5px, 1.45vw, 18.5px);}
   .engine-opt{padding:16px;}
   .engine-opt .eo-t{font-size:clamp(16px, 1.4vw, 18px);}
   .engine-opt .eo-d{font-size:clamp(14px, 1.2vw, 16px);}
@@ -11267,8 +11263,7 @@ function syncSelUI(){
     all.textContent = allOn ? '取消全选' : '全选';
   }
 
-  // 批量操作按钮随当前选项卡切换：
-  // 待复习 → 只有「转为已掌握」；已掌握 → 只有「转为待复习」；全部 → 两个都给
+  // 按整个跨分类选择集合决定可用操作。
   const empty = S.sel.size === 0;
   const f = S.libFilter;
   const m = $('btnSelMaster'), u = $('btnSelUnmaster');
