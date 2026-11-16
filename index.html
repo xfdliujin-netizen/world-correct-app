@@ -892,6 +892,49 @@ button{
 }
 .g-blank.ok{border-style:solid;border-color:var(--primary);background:var(--primary-l);color:var(--primary);}
 .g-blank.hint{border-style:solid;border-color:var(--amber);background:transparent;color:var(--amber);}
+
+/* ---------- 成语：逐字拼音 + 释义 ---------- */
+.gq-text.is-idiom{text-align:center;letter-spacing:0;}
+.gq-chars{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-end;
+  gap:.08em .28em;
+}
+.gq-ch{display:inline-flex;flex-direction:column;align-items:center;gap:.08em;}
+.gq-ch-py{
+  font-size:.36em;line-height:1.2;font-weight:600;letter-spacing:0;
+  color:var(--muted);font-family:"Times New Roman",Georgia,serif;
+  white-space:nowrap;
+}
+.gq-ch-py.is-target{color:var(--game);}
+.gq-ch .gq-ch-zi{
+  font-family:var(--font-cn);line-height:1.2;color:var(--ink);
+}
+.gq-text.is-idiom .g-blank{margin:0;letter-spacing:0;}
+.gq-explain{
+  border-top:1px dashed var(--line-2);padding-top:9px;
+  display:flex;flex-direction:column;gap:4px;flex:none;
+}
+.gq-ex-head{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:800;letter-spacing:1.2px;color:var(--game);
+}
+.gq-ex-head .ic{width:14px;height:14px;}
+.gq-ex-text{
+  margin:0;font-size:14px;line-height:1.8;color:var(--ink-2);
+  font-family:var(--font-cn);letter-spacing:.3px;
+}
+.gq-ex-text .ex-mask{color:var(--game);font-family:inherit;font-weight:700;}
+.gq-ex-load{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:13px;color:var(--muted);line-height:1.6;
+}
+.gq-ex-load .gq-spin{width:14px;height:14px;border-width:2px;flex:none;}
+.gq-ex-retry{
+  min-height:28px;padding:0 10px;border-radius:9px;
+  border:1px solid var(--line-2);background:var(--surface);
+  color:var(--game);font-size:12.5px;font-weight:700;
+}
+.gq-ex-retry:active{transform:scale(.95);}
 .gq-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none;margin-top:auto;}
 .gq-prog{display:flex;gap:6px;align-items:center;}
 .gq-prog i{width:9px;height:9px;border-radius:50%;background:var(--line-2);}
@@ -1527,6 +1570,11 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
   .game-quest{min-height:0;padding:14px;gap:10px;}
   .gq-text{font-size:24px;letter-spacing:1.5px;}
   .gq-text.is-sent{font-size:17px;}
+  .gq-text.is-idiom{font-size:22px;letter-spacing:0;}
+  .gq-chars{gap:.06em .2em;}
+  .gq-ch-py{font-size:.4em;}
+  .gq-explain{padding-top:8px;}
+  .gq-ex-text{font-size:13px;line-height:1.7;}
   .game-write-col .tian-wrap{flex:none;}
   .game-tian{width:min(var(--pad),82vw);}
   .game-tools .mini{min-height:36px;padding:0 12px;}
@@ -2197,7 +2245,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
           <div class="game-head">
             <span class="game-head-mark"></span>
             <strong>填词游戏</strong>
-            <span class="game-head-sub">AI 出题 · 挖空填字 · 练字又长知识</span>
+            <span class="game-head-sub">AI 出题 · 逐字拼音 · 成语释义 · 练字又长知识</span>
             <button class="chip" id="btnAiCfg" type="button">
               <svg class="ic"><use href="#i-gear"/></svg><span>AI 设置</span>
             </button>
@@ -2207,7 +2255,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
           <div id="gameGuide" class="game-guide hidden">
             <div class="big-ic"><svg class="ic"><use href="#i-game"/></svg></div>
             <h2 id="gameGuideTitle">先连接 AI，才能自动出题</h2>
-            <p id="gameGuideText">填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个句子，根据拼音补全空格，挑战成语和佳句。</p>
+            <p id="gameGuideText">填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个句子：成语的每个字都标好拼音，下面还会给出通俗易懂的释义，你只要根据拼音补全空格。</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px">
               <button class="btn btn-primary" id="gameGuideBtn1">配置 DeepSeek</button>
               <button class="btn btn-soft" data-goto="entry">去录入生字</button>
@@ -11533,6 +11581,73 @@ function gameCacheSet(ch, idioms, sentences, words){
   try{ localStorage.setItem(GAME_STORE, JSON.stringify(all)); }catch(e){}
 }
 
+/* ---------- 成语拼音 / 释义缓存（按成语永久复用，最多 300 条） ---------- */
+const IDIOM_STORE = 'hanzi.idiom.v1';   // { 成语: { p:[逐字拼音], d:'释义', at:时间 } }
+function idiomCacheAll(){
+  try{ return JSON.parse(localStorage.getItem(IDIOM_STORE) || '{}') || {}; }catch(e){ return {}; }
+}
+function idiomCacheGet(text){
+  const c = idiomCacheAll()[text];
+  if(!c || typeof c.d !== 'string' || !c.d) return null;
+  return { pinyin: Array.isArray(c.p) ? c.p : [], meaning: c.d };
+}
+function idiomCacheSet(text, pinyin, meaning){
+  const all = idiomCacheAll();
+  all[text] = { p: pinyin, d: meaning, at: Date.now() };
+  const keys = Object.keys(all);
+  if(keys.length > 300){
+    keys.sort(function(a, b){ return (all[a].at || 0) - (all[b].at || 0); });
+    keys.slice(0, keys.length - 300).forEach(function(k){ delete all[k]; });
+  }
+  try{ localStorage.setItem(IDIOM_STORE, JSON.stringify(all)); }catch(e){}
+}
+/* 本机即时拼音（按成语上下文读音；AI 结果回来后再升级为人工校对过的读音） */
+function idiomPinyinLocal(text){
+  return String(text).split('').map(function(c){ return pyOf(c, [text]) || ''; });
+}
+/* 调 API 拿「逐字拼音 + 一句释义」，结果写进缓存 */
+function normPinyin(text, raw){
+  const local = idiomPinyinLocal(text);
+  const arr = Array.isArray(raw) ? raw : [];
+  return String(text).split('').map(function(c, i){
+    const v = String(arr[i] == null ? '' : arr[i]).replace(/[\s,，、]/g, '');
+    const ok = v && v.length <= 8 && !/[\u3400-\u9fff]/.test(v);
+    return ok ? v : (local[i] || '');
+  });
+}
+async function fetchIdiomDetail(text){
+  const hit = idiomCacheGet(text);
+  if(hit) return hit;
+  if(!AI.key) throw new Error('还没有配置 DeepSeek API Key');
+  const sys = '你是一位小学语文老师，擅长用孩子一听就懂的话讲成语。你的回答永远是一个严格的 JSON 对象，不含任何其他文字。';
+  const user =
+    '请处理成语「' + text + '」：\n' +
+    '1. 逐字注音：给这个成语的每一个字标一个拼音，必须带声调符号，顺序与字一一对应；多音字按这个成语里的实际读法（例如「长」在「取长补短」里读 cháng，「行」在「行之有效」里读 xíng）。\n' +
+    '2. 写一句释义：先说关键字的意思，再说整个成语形容什么或比喻什么；不超过 50 字，用小学生听得懂的词，不要生僻字、不要文言腔、不要干巴巴的成语词典腔；不要以成语本身开头复述成语，直接讲意思。\n' +
+    '只输出 JSON：{"pinyin":["","","",""],"meaning":""}';
+  const txt = await deepseekChat(sys, user);
+  const j = parseAiJson(txt);
+  if(!j) throw new Error('AI 返回的格式不对');
+  let pinyin = normPinyin(text, j.pinyin);
+
+  // 拼音有缺（模型少给/给错）→ 单独追问一次，只补拼音
+  if(pinyin.some(function(v){ return !v; })){
+    try{
+      const ask = String(text).split('').map(function(){ return '""'; }).join(',');
+      const t2 = await deepseekChat('你只输出一个 JSON 对象，不含任何其他文字。',
+        '成语「' + text + '」共 ' + text.length + ' 个字，请给出每个字的拼音（带声调符号，按这个成语里的实际读法），一个都不能少。\n只输出 JSON：{"pinyin":[' + ask + ']}');
+      const j2 = parseAiJson(t2);
+      const p2 = normPinyin(text, j2 && j2.pinyin);
+      pinyin = pinyin.map(function(v, i){ return v || p2[i] || ''; });
+    }catch(e){}
+  }
+
+  const meaning = String(j.meaning || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  if(meaning.length < 4) throw new Error('AI 没给出释义，稍后重试');
+  idiomCacheSet(text, pinyin, meaning);
+  return { pinyin: pinyin, meaning: meaning };
+}
+
 /* ---------- DeepSeek 调用（用户自己的 Key，仅保存在本机） ---------- */
 async function deepseekChat(sysPrompt, userPrompt){
   const res = await fetch('https://api.deepseek.com/chat/completions', {
@@ -11639,7 +11754,7 @@ function gameShowGuide(){
   guide.classList.remove('hidden'); body.classList.add('hidden');
   $('gameGuideTitle').textContent = !AI.key ? '先连接 AI，才能自动出题' : '字库里还没有生字';
   $('gameGuideText').textContent = !AI.key
-    ? '填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个优美句子，把生字挖空，让你手写填字。'
+    ? '填词游戏会根据你录入的生字，用 DeepSeek 生成 3 个成语和 3 个优美句子：成语逐字标注拼音，下方附通俗释义，再根据拼音补全空格。'
     : '先去「录入」添加几个生字，再回来玩填词游戏。';
   $('gameGuideBtn1').classList.toggle('hidden', !!AI.key);
   return false;
@@ -11666,7 +11781,9 @@ async function startGame(ch, force){
       GAME.items.push({type:'sentence',text:source.data.sentences[i],char:source.char});
     }
     GAME.items.sort(()=>Math.random()-.5);GAME.idx=0;
+    GAME.items.forEach(function(it){ if(it.type==='idiom'){ it.py = idiomPinyinLocal(it.text); it.detail = idiomCacheGet(it.text); } });
     GAME.states=GAME.items.map(()=> '');GAME.hintOn=false;renderGameQuest();
+    warmIdiomDetails();
   }catch(e){renderGameError(ch,e);}
   finally{GAME.busy=false;}
 }
@@ -11699,10 +11816,114 @@ function renderGameIdle(){
 }
 
 /* 把目标字挖空显示；答对变绿，看过提示变琥珀色 */
-function questHtml(item, state, ch){
+function blankSpan(state, ch){
   const cls = state === 'ok' ? 'g-blank ok' : (GAME.hintOn ? 'g-blank hint' : 'g-blank');
   const inner = (state === 'ok' || GAME.hintOn) ? ch : '　';
-  return item.text.split(ch).map(escHtml).join('<span class="'+cls+'" aria-label="待填写的生字">'+escHtml(inner)+'</span>');
+  return '<span class="'+cls+'" aria-label="待填写的生字">'+escHtml(inner)+'</span>';
+}
+function questHtml(item, state, ch){
+  return item.text.split(ch).map(escHtml).join(blankSpan(state, ch));
+}
+
+/* 成语：每个字上方标拼音（填空那个字的拼音用游戏色强调） */
+function idiomHtml(item, state){
+  const py = (item.detail && item.detail.pinyin) || item.py || idiomPinyinLocal(item.text);
+  const ch = GAME.char;
+  const cells = String(item.text).split('').map(function(c, i){
+    const isT = c === ch;
+    const p = escHtml(py[i] || '');
+    const zi = isT ? blankSpan(state, ch) : '<span class="gq-ch-zi">' + escHtml(c) + '</span>';
+    return '<span class="gq-ch">' +
+             '<span class="gq-ch-py' + (isT ? ' is-target' : '') + '">' + (p || '&nbsp;') + '</span>' +
+             zi +
+           '</span>';
+  }).join('');
+  return '<div class="gq-text is-idiom"><div class="gq-chars">' + cells + '</div></div>';
+}
+
+/* 释义里若出现要填的生字，答对前先用 ○ 遮住，避免直接送答案 */
+function maskChar(txt, ch, reveal){
+  const s = escHtml(txt);
+  if(reveal || !ch) return s;
+  return s.split(escHtml(ch)).join('<span class="ex-mask">○</span>');
+}
+function explainInner(item){
+  if(!item || item.type !== 'idiom') return '';
+  const head = '<div class="gq-ex-head"><svg class="ic"><use href="#i-book"/></svg><span>成语释义</span></div>';
+  if(item.detail){
+    const reveal = GAME.states[GAME.idx] === 'ok' || GAME.hintOn;
+    return head + '<p class="gq-ex-text">' + maskChar(item.detail.meaning, GAME.char, reveal) + '</p>';
+  }
+  if(item.detailErr){
+    const msg = String((item.detailErr && item.detailErr.message) || '网络不太好').slice(0, 40);
+    return head + '<div class="gq-ex-load"><span>释义没查到：' + escHtml(msg) + '</span>' +
+      '<button class="gq-ex-retry" type="button">重试</button></div>';
+  }
+  return head + '<div class="gq-ex-load"><span class="gq-spin"></span><span>正在查这个成语的释义…</span></div>';
+}
+
+/* 拿不到就拉一次；拿到后只替换释义那块，不动用户已经输入的字 */
+function ensureExplain(item){
+  if(!item || item.type !== 'idiom' || item.detail || item.detailBusy) return;
+  item.detailBusy = true;
+  item.detailErr = null;
+  fetchIdiomDetail(item.text).then(function(d){
+    item.detail = d;
+  }).catch(function(e){
+    item.detailErr = e;
+  }).then(function(){
+    item.detailBusy = false;
+    updateExplainDom(item);
+  });
+}
+function updateExplainDom(item){
+  if(!item || !GAME.items.length || GAME.items[GAME.idx] !== item) return;
+  applyPinyinDom(item);
+  const box = $('gameExplain');
+  if(!box) return;
+  box.innerHTML = explainInner(item);
+  bindExplainRetry(box, item);
+}
+/* 拼音是异步补上的，拿到后要把上面那排拼音一起刷新（先显示的本机读音可能不全） */
+function applyPinyinDom(item){
+  const py = item && item.detail && item.detail.pinyin;
+  if(!py || !py.length) return;
+  const cells = document.querySelectorAll('#gameQuest .gq-chars .gq-ch');
+  if(!cells.length) return;
+  cells.forEach(function(cell, i){
+    const el = cell.querySelector('.gq-ch-py');
+    if(el && py[i]) el.textContent = py[i];
+  });
+}
+function bindExplainRetry(box, item){
+  const r = box.querySelector('.gq-ex-retry');
+  if(!r) return;
+  r.addEventListener('click', function(){
+    item.detailErr = null; item.detailBusy = false;
+    box.innerHTML = explainInner(item);
+    ensureExplain(item);
+  });
+}
+/* 提前把本轮所有成语的释义备好（命中缓存的不会花钱） */
+function warmIdiomDetails(){
+  const list = GAME.items.filter(function(it){ return it.type === 'idiom'; });
+  let i = 0;
+  const step = function(){
+    if(i >= list.length) return;
+    const it = list[i++];
+    if(it.detail || it.detailBusy){ step(); return; }
+    it.detailBusy = true;
+    fetchIdiomDetail(it.text).then(function(d){
+      it.detail = d;
+    }).catch(function(e){
+      it.detailErr = e;
+    }).then(function(){
+      it.detailBusy = false;
+      updateExplainDom(it);
+      step();
+    });
+  };
+  step();
 }
 
 function renderGameQuest(){
@@ -11711,6 +11932,7 @@ function renderGameQuest(){
   const item = GAME.items[GAME.idx];
   GAME.char=item.char || GAME.char;
   const st = GAME.states[GAME.idx];
+  const isIdiom = item.type === 'idiom';
   let dots = '';
   GAME.states.forEach(function(s, k){
     dots += '<i class="' + (s === 'ok' ? 'ok' : (k === GAME.idx ? 'cur' : '')) + '"></i>';
@@ -11719,9 +11941,11 @@ function renderGameQuest(){
   const py = (w && w.pinyin) || pyOf(GAME.char, (w && w.words) || []);
   q.innerHTML =
     '<div class="game-score"><span>⭐ 已点亮 ' + GAME.states.filter(s=>s==='ok').length + ' / 6 颗星</span><span>读拼音 · 补空格</span></div>' +
-    '<div class="gq-type">' + (item.type === 'idiom' ? '成语挑战' : '佳句挑战') + '</div>' +
+    '<div class="gq-type">' + (isIdiom ? '成语挑战' : '佳句挑战') + '</div>' +
     '<div class="gq-pinyin">' + escHtml(py || '试试根据上下文填写') + '</div>' +
-    '<div class="gq-text' + (item.type === 'sentence' ? ' is-sent' : '') + '">' + questHtml(item, st, GAME.char) + '</div>' +
+    (isIdiom
+      ? idiomHtml(item, st) + '<div class="gq-explain" id="gameExplain">' + explainInner(item) + '</div>'
+      : '<div class="gq-text is-sent">' + questHtml(item, st, GAME.char) + '</div>') +
     '<div class="gq-foot">' +
       '<span class="gq-prog">' + dots + '</span>' +
       '<span class="gq-count">第 ' + (GAME.idx + 1) + ' / ' + GAME.items.length + ' 题' +
@@ -11733,6 +11957,11 @@ function renderGameQuest(){
     form.onsubmit=function(e){e.preventDefault();if(form.querySelector('input').value.trim()===GAME.char)gameAnswerOk();else toast('💡 再看一眼拼音，你一定能想起来！');};q.appendChild(form);
   }else{
     const next=document.createElement('button');next.className='btn btn-primary';next.textContent='读一读，下一题';next.onclick=gameNext;q.appendChild(next);
+  }
+  if(isIdiom){
+    const ex = $('gameExplain');
+    if(ex) bindExplainRetry(ex, item);
+    ensureExplain(item);
   }
   resetGameInput();
   $('gameHint').innerHTML =
