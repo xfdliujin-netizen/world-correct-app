@@ -11878,10 +11878,22 @@ function ensureExplain(item){
 }
 function updateExplainDom(item){
   if(!item || !GAME.items.length || GAME.items[GAME.idx] !== item) return;
+  applyPinyinDom(item);
   const box = $('gameExplain');
   if(!box) return;
   box.innerHTML = explainInner(item);
   bindExplainRetry(box, item);
+}
+/* 拼音是异步补上的，拿到后要把上面那排拼音一起刷新（先显示的本机读音可能不全） */
+function applyPinyinDom(item){
+  const py = item && item.detail && item.detail.pinyin;
+  if(!py || !py.length) return;
+  const cells = document.querySelectorAll('#gameQuest .gq-chars .gq-ch');
+  if(!cells.length) return;
+  cells.forEach(function(cell, i){
+    const el = cell.querySelector('.gq-ch-py');
+    if(el && py[i]) el.textContent = py[i];
+  });
 }
 function bindExplainRetry(box, item){
   const r = box.querySelector('.gq-ex-retry');
