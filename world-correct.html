@@ -11606,6 +11606,15 @@ function idiomPinyinLocal(text){
   return String(text).split('').map(function(c){ return pyOf(c, [text]) || ''; });
 }
 /* 调 API 拿「逐字拼音 + 一句释义」，结果写进缓存 */
+function normPinyin(text, raw){
+  const local = idiomPinyinLocal(text);
+  const arr = Array.isArray(raw) ? raw : [];
+  return String(text).split('').map(function(c, i){
+    const v = String(arr[i] == null ? '' : arr[i]).replace(/[\s,，、]/g, '');
+    const ok = v && v.length <= 8 && !/[\u3400-\u9fff]/.test(v);
+    return ok ? v : (local[i] || '');
+  });
+}
 async function fetchIdiomDetail(text){
   const hit = idiomCacheGet(text);
   if(hit) return hit;
@@ -11619,14 +11628,20 @@ async function fetchIdiomDetail(text){
   const txt = await deepseekChat(sys, user);
   const j = parseAiJson(txt);
   if(!j) throw new Error('AI 返回的格式不对');
-  const chars = String(text).split('');
-  const raw = Array.isArray(j.pinyin) ? j.pinyin.map(function(s){ return String(s == null ? '' : s).trim(); }) : [];
-  const local = idiomPinyinLocal(text);
-  const pinyin = chars.map(function(c, i){
-    const v = (raw[i] || '').replace(/[\s,，、]/g, '');
-    const ok = v && v.length <= 8 && !/[\u3400-\u9fff]/.test(v);
-    return ok ? v : local[i];
-  });
+  let pinyin = normPinyin(text, j.pinyin);
+
+  // 拼音有缺（模型少给/给错）→ 单独追问一次，只补拼音
+  if(pinyin.some(function(v){ return !v; })){
+    try{
+      const ask = String(text).split('').map(function(){ return '""'; }).join(',');
+      const t2 = await deepseekChat('你只输出一个 JSON 对象，不含任何其他文字。',
+        '成语「' + text + '」共 ' + text.length + ' 个字，请给出每个字的拼音（带声调符号，按这个成语里的实际读法），一个都不能少。\n只输出 JSON：{"pinyin":[' + ask + ']}');
+      const j2 = parseAiJson(t2);
+      const p2 = normPinyin(text, j2 && j2.pinyin);
+      pinyin = pinyin.map(function(v, i){ return v || p2[i] || ''; });
+    }catch(e){}
+  }
+
   const meaning = String(j.meaning || '').replace(/\s+/g, ' ').trim().slice(0, 120);
   if(meaning.length < 4) throw new Error('AI 没给出释义，稍后重试');
   idiomCacheSet(text, pinyin, meaning);
