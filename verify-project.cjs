@@ -5,22 +5,23 @@ const html = fs.readFileSync('index.html','utf8');
 for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(m[1]);
 assert.equal(html,fs.readFileSync('world-correct.html','utf8'));
 function section(start,end){ return html.slice(html.indexOf(start),html.indexOf(end,html.indexOf(start))); }
-const elements = {entryWholeWord:{value:'介绍'}};
+const elements = {entryWholeWord:{value:'介绍'},entryWordPinyin:{value:''}};
 let saves=0;
 const ctx = vm.createContext({console,Set,Date,Array,
   $:id=>elements[id],toast:()=>{},save:()=>saves++,renderLib:()=>{},
   S:{words:[{char:'介',words:[],count:3,mastered:true,createdAt:7,pinyin:'jiè'}]},
-  DICT:{},LEX:{},pyOf:c=>({'介':'jiè','绍':'shào','借':'jiè','荷':'hé','花':'huā'}[c] || '')});
+  wordPinyin:()=> 'jiè shào',DICT:{},LEX:{},pyOf:c=>({'介':'jiè','绍':'shào','借':'jiè','荷':'hé','花':'huā'}[c] || '')});
 vm.runInContext(section('function saveWholeWord(){','function saveEntry(){'),ctx);
 vm.runInContext('saveWholeWord()',ctx);
 assert.equal(ctx.S.words.length,2);
 assert.equal(ctx.S.words.find(w=>w.char==='介').count,3);
 assert.equal(ctx.S.words.find(w=>w.char==='介').mastered,true);
-assert.ok(ctx.S.words.every(w=>w.words.includes('介绍')));
+assert.equal(ctx.S.words.find(w=>w.char==='介绍').count,0);
+assert.equal(ctx.S.words.some(w=>w.char==='绍'),false);
 elements.entryWholeWord.value='介绍'; vm.runInContext('saveWholeWord()',ctx);
 assert.equal(ctx.S.words.length,2);
 elements.entryWholeWord.value='介绍123'; vm.runInContext('saveWholeWord()',ctx);
-assert.equal(saves,2);
+assert.equal(saves,1);
 vm.runInContext(section('const VOICE_HEAD =','function voiceShowResult('),ctx);
 const spoken = text=>vm.runInContext('parseSpokenChar('+JSON.stringify(text)+')',ctx);
 assert.equal(spoken('介绍的借').ch,'介');
