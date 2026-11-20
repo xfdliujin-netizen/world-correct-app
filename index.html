@@ -2216,8 +2216,8 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
               <details class="word-entry">
                 <summary>整词录入</summary>
                 <label class="desc" for="entryWholeWord">输入 2～12 个汉字，保存为独立词卡，复习时逐格默写整个词语。已有单字进度不变。</label>
-                <input id="entryWordPinyin" class="input" placeholder="词语拼音（可选，可校正多音字）" aria-label="词语拼音" />
                 <input id="entryWholeWord" class="input" placeholder="例如：介绍、荷花（一次一个词）" maxlength="12" />
+                <input id="entryWordPinyin" class="input" placeholder="词语拼音（可选，可校正多音字）" aria-label="词语拼音" />
                 <button id="btnSaveWholeWord" class="btn btn-soft" type="button">将整词加入错字本</button>
               </details>
               <div class="field">
@@ -9947,8 +9947,8 @@ function showSummary(){
   const practiced = S.queue.length;
   const mins = Math.max(1, Math.round((Date.now() - S.roundStart) / 60000));
 
-  $('sumCount').textContent = practiced + ' 字';
-  $('sumMastered').textContent = S.newly.size + ' 字';
+  $('sumCount').textContent = practiced + ' 项';
+  $('sumMastered').textContent = S.newly.size + ' 项';
   $('sumTime').textContent = mins + ' 分';
 }
 
