@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const html=fs.readFileSync('index.html','utf8');
 const section=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
 const ctx=vm.createContext({console,Set,Array,JSON,escHtml:s=>s,GAME:{hintOn:false},deepseekChat:async()=>JSON.stringify({words:['春天','春风','春雨'],idioms:['春暖花开','春风化雨','春色满园'],sentences:['春风轻轻拂过河岸，柳树的嫩芽在阳光里慢慢舒展。','春雨落在松软的泥土上，沉睡的种子悄悄伸出了根。','春天的燕子掠过清澈的湖面，翅膀剪开一片金色晨光。']})});
-vm.runInContext(section('function questHtml','function renderGameQuest'),ctx);
+vm.runInContext(section('function blankSpan','function renderGameQuest'),ctx);
 assert.equal(vm.runInContext("questHtml({text:'春去春来'},'', '春').includes('春')",ctx),false);
 vm.runInContext(section('function parseAiJson','/* ---------- 游戏流程'),ctx);
 (async()=>{
