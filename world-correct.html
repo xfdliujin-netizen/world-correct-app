@@ -1894,7 +1894,11 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 .gq-pinyin{font-size:24px;color:var(--primary);font-weight:700;text-align:center;padding:10px;}
 .game-score{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-2);}
 
-#wordReview{width:100%;min-width:0;overflow:auto;padding:8px 4px;}
+#wordReview{width:100%;min-width:0;min-height:0;overflow:auto;padding:8px 4px;}
+.word-mode .pane-write{justify-content:flex-start;overflow-y:auto;}
+.word-mode .pane-write .pinyin{font-size:clamp(22px,4vw,34px);white-space:normal;overflow-wrap:anywhere;}
+.word-mode .pane-write .prompt{padding-top:24px;}
+#dChar{overflow-wrap:anywhere;max-width:100%;}
 #wordReview[hidden],#wordType[hidden]{display:none;}
 .word-modes{display:flex;gap:8px;margin-bottom:10px;}
 .word-cells{display:flex;gap:12px;overflow-x:auto;padding:6px 2px 14px;scroll-snap-type:x proximity;}
@@ -8412,7 +8416,7 @@ function updateCounts(){
   $('libCountLearning').textContent = learning;
   $('libCountMastered').textContent = mastered;
   $('libCountAll').textContent = S.words.length;
-  $('topSub').textContent = '待复习 ' + learning + ' 字';
+  $('topSub').textContent = '待复习 ' + learning + ' 项';
   $('roundSizeLabel').textContent = S.roundSize;
 
   const badge = $('tabBadge');
@@ -9603,6 +9607,7 @@ function renderCard(){
     const masked = w.split(item.char).join('<span class="blank">□</span>');
     return '<span class="hint-chip">' + masked + ' <small>' + (py || '') + '</small></span>';
   });
+  if(item.char.length > 1){ hints = ['<span class="hint-chip">整词默写 · ' + item.char.length + ' 个字</span>']; }
   if(!hints.length){
     hints = ['<span class="hint-chip">暂无组词 · 凭拼音直接默写</span>'];
   }
