@@ -9875,7 +9875,7 @@ function bindSwipe(){
 
   const blockedAt = function(el){
     if(!el || !el.closest) return true;
-    return !!el.closest('.tian-wrap, .quiz-host, .pad-tools, .stroke-btns, .stroke-col, .eng-chip, button, input, textarea, a, .modal');
+    return !!el.closest('.tian-wrap, .word-cells, canvas, .quiz-host, .pad-tools, .stroke-btns, .stroke-col, .eng-chip, button, input, textarea, select, a, .modal');
   };
 
   const paint = function(){
