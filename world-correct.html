@@ -13310,9 +13310,9 @@ function bind(){
   $('dPractice').addEventListener('click', function(){
     const ch = S.detailChar;
     const item = S.words.filter(function(w){ return w.char === ch; })[0];
-    if(item){ item.mastered = false; save(); }
+    if(!item) return;
     closeDetail();
-    switchTab('review', ch);
+    switchTab('review', null, [ch]);
   });
 
   $('dToggle').addEventListener('click', function(){
