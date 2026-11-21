@@ -1933,6 +1933,10 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 #modalDetail #dChar,#modalDetail .detail-head+div,#modalDetail .info-label,#modalDetail #dWords,#modalDetail #dSentence{display:none!important;}
 #modalDetail .dh-py{font-size:clamp(24px,4vw,36px);overflow-wrap:anywhere;}
 .word-mode #ansWords,.word-mode .info-label:has(+ #ansWords){display:none;}
+
+.word-cell canvas{width:100%;height:auto;aspect-ratio:1;box-sizing:border-box;background:linear-gradient(90deg,transparent calc(50% - .5px),#d9d0bd calc(50% - .5px),#d9d0bd calc(50% + .5px),transparent calc(50% + .5px)),linear-gradient(transparent calc(50% - .5px),#d9d0bd calc(50% - .5px),#d9d0bd calc(50% + .5px),transparent calc(50% + .5px)),var(--paper);}
+.word-cell[hidden]{display:none;}
+@media(min-width:601px){.word-cells{grid-template-columns:repeat(var(--word-count,2),minmax(0,1fr));}}
 </style>
 </head>
 
