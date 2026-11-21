@@ -1910,6 +1910,20 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 .lib-card.is-word .lc-char{font-size:24px;line-height:1.3;overflow-wrap:anywhere;}
 .lib-card.is-word .lc-py{font-size:11px;}
 #wordType{display:flex;flex-wrap:wrap;gap:10px;}#wordAnswer{min-width:0;flex:1;}
+
+.entry-type-tabs{display:flex;gap:10px;flex:none;margin-bottom:16px;}
+.entry-type-tabs .btn{flex:1;min-width:0;}
+#wordEntryPanel[hidden]{display:none;}
+.word-entry-active .entry-preview,.word-entry-active .entry-form>:not(.word-entry){display:none!important;}
+.word-entry-active .entry-grid{grid-template-columns:minmax(0,1fr);overflow-y:auto;align-items:start;}
+.word-entry-active .entry-form{width:100%;max-width:660px;justify-self:center;justify-content:flex-start;}
+#view-game .gq-text{font-size:clamp(30px,3.2vw,42px);}
+#view-game .gq-text.is-idiom{font-size:clamp(32px,3.6vw,46px);}
+#view-game .gq-text.is-sent{font-size:clamp(22px,2.2vw,28px);line-height:1.85;}
+#view-game .gq-ch-py{font-size:clamp(18px,1.8vw,23px);line-height:1.4;}
+#view-game .gq-chars{gap:10px 12px;}
+#view-game .gq-pinyin{font-size:clamp(30px,3vw,38px);line-height:1.4;}
+@media(max-width:360px){#view-game .gq-chars{gap:10px 8px;}#view-game .gq-text.is-idiom{font-size:30px;}#view-game .gq-ch-py{font-size:17px;}}
 </style>
 </head>
 
@@ -2174,8 +2188,12 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
         <div class="card entry-card">
           <div class="entry-head">
             <span class="entry-head-mark"></span>
-            <strong>生字录入</strong>
-            <span class="entry-head-sub">整理工作台 · 手写或输入定字</span>
+            <strong id="entryTitle">生字录入</strong>
+            <span class="entry-head-sub" id="entrySubtitle">整理工作台 · 手写或输入定字</span>
+          </div>
+          <div class="entry-type-tabs" role="group" aria-label="录入类型">
+            <button type="button" id="btnEntrySingle" class="btn btn-primary" aria-pressed="true">生字录入</button>
+            <button type="button" id="btnEntryWord" class="btn btn-soft" aria-pressed="false">整词录入</button>
           </div>
           <div class="entry-grid">
 
@@ -2213,13 +2231,12 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
             </div>
 
             <div class="entry-form">
-              <details class="word-entry">
-                <summary>整词录入</summary>
-                <label class="desc" for="entryWholeWord">输入 2～12 个汉字，保存为独立词卡，复习时逐格默写整个词语。已有单字进度不变。</label>
-                <input id="entryWholeWord" class="input" placeholder="例如：介绍、荷花（一次一个词）" maxlength="12" />
+              <div class="word-entry" id="wordEntryPanel" hidden>
+                <label class="desc" for="entryWholeWord">输入 2～4 个汉字，保存为独立词卡，复习时逐格默写整个词语。已有单字进度不变。</label>
+                <input id="entryWholeWord" class="input" placeholder="例如：介绍、荷花（一次一个词）" maxlength="4" />
                 <input id="entryWordPinyin" class="input" placeholder="词语拼音（可选，可校正多音字）" aria-label="词语拼音" />
                 <button id="btnSaveWholeWord" class="btn btn-soft" type="button">将整词加入错字本</button>
-              </details>
+              </div>
               <div class="field">
                 <div class="row-2 char-row">
                   <input id="entryChar" class="input center char" type="text" maxlength="2"
@@ -10638,7 +10655,7 @@ function clearEntrySentences(){
 
 function saveWholeWord(){
   const word = $('entryWholeWord').value.trim();
-  if(!/^[\u4e00-\u9fa5]{2,12}$/.test(word)){ toast('请输入 2～12 个汉字，一次录入一个词语'); return; }
+  if(!/^[\u4e00-\u9fa5]{2,4}$/.test(word)){ toast('请输入 2～4 个汉字，一次录入一个词语'); return; }
   if(S.words.some(function(w){ return w.char === word; })){ toast('这个词已经在字库中，复习进度已保留'); return; }
   S.words.unshift({char:word,pinyin:($('entryWordPinyin').value.trim() || wordPinyin(word)),words:[],sentence:'',sentences:[],count:0,mastered:false,createdAt:Date.now()});
   save(); renderLib();
@@ -12898,7 +12915,21 @@ function switchTab(tab, focusChar, selectedChars){
    ============================================================ */
 let suppressCardClick = false;
 
+function setEntryType(type){
+  const word=type==='word';
+  $('view-entry').classList.toggle('word-entry-active',word);
+  $('wordEntryPanel').hidden=!word;
+  $('entryTitle').textContent=word?'整词录入':'生字录入';
+  $('entrySubtitle').textContent=word?'2～4 个字 · 保存整词，复习整词':'整理工作台 · 手写或输入定字';
+  ['Single','Word'].forEach(function(name){
+    const on=(name==='Word')===word,btn=$('btnEntry'+name);
+    btn.classList.toggle('btn-primary',on);btn.classList.toggle('btn-soft',!on);btn.setAttribute('aria-pressed',String(on));
+  });
+  if(!word && entryPad) setTimeout(function(){entryPad.resize();},30);
+}
 function bind(){
+  $('btnEntrySingle').onclick=function(){setEntryType('single');};
+  $('btnEntryWord').onclick=function(){setEntryType('word');};
   $('wordHand').onclick=function(){setWordInputMode('hand');};
   $('wordKeyboard').onclick=function(){setWordInputMode('keyboard');};
   $('wordCheck').onclick=checkWholeWord;
