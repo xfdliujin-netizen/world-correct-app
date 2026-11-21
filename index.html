@@ -1924,6 +1924,15 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 #view-game .gq-chars{gap:10px 12px;}
 #view-game .gq-pinyin{font-size:clamp(30px,3vw,38px);line-height:1.4;}
 @media(max-width:360px){#view-game .gq-chars{gap:10px 8px;}#view-game .gq-text.is-idiom{font-size:30px;}#view-game .gq-ch-py{font-size:17px;}}
+
+.word-cells{display:grid;grid-template-columns:repeat(min(var(--word-count,2),2),minmax(0,1fr));gap:14px;width:100%;overflow:visible;}
+.word-cell{min-width:0;}
+.word-cell[hidden]{display:none;}
+.word-cell canvas{width:100%;height:auto;aspect-ratio:1;}
+@media(min-width:601px){.word-cells{grid-template-columns:repeat(min(var(--word-count,4),4),minmax(0,1fr));}}
+#modalDetail #dChar,#modalDetail .detail-head+div,#modalDetail .info-label,#modalDetail #dWords,#modalDetail #dSentence{display:none!important;}
+#modalDetail .dh-py{font-size:clamp(24px,4vw,36px);overflow-wrap:anywhere;}
+.word-mode #ansWords,.word-mode .info-label:has(+ #ansWords){display:none;}
 </style>
 </head>
 
@@ -9557,6 +9566,7 @@ function setupWordReview(item){
   $('stage').classList.toggle('word-mode',isWord);
   $('wordReview').hidden=!isWord;
   if(!isWord) return;
+  $('wordCells').style.setProperty('--word-count',item.char.length);
   stopQuiz();ENG.cur='local';
   $('wordAnswer').value='';$('wordResult').textContent='';
   for(let i=0;i<item.char.length;i++){
@@ -9576,10 +9586,10 @@ function setupWordReview(item){
 }
 function setWordInputMode(mode){
   WORD_REVIEW.mode=mode;
-  $('wordCells').hidden=mode!=='hand';$('wordCells').style.display=mode==='hand'?'flex':'none';
+  $('wordCells').hidden=mode!=='hand';$('wordCells').style.display=mode==='hand'?'grid':'none';
   $('wordType').hidden=mode!=='keyboard';
   $('wordHand').classList.toggle('on',mode==='hand');$('wordKeyboard').classList.toggle('on',mode==='keyboard');
-  $('wordHelp').textContent=mode==='hand'?'每格写一个字，可左右滑动。写完对照整词，全部写对才点「写对了」。':'输入完整词语，检查通过后记录一次正确。';
+  $('wordHelp').textContent=mode==='hand'?'每格写一个字，格子按词语字数排列。写完对照整词，全部写对才点「写对了」。':'输入完整词语，检查通过后记录一次正确。';
   WORD_REVIEW.pads.forEach(function(p){p.resize();});
 }
 function checkWholeWord(){
@@ -11373,7 +11383,7 @@ function renderLib(){
       status +
       '<div class="lc-py">' + (w.pinyin || '') + '</div>' +
       '<div class="lc-char">' + w.char + '</div>' +
-      '<div class="lc-words">' + w.words.slice(0, 3).join(' · ') + '</div>' +
+      (w.char.length > 1 ? '' : '<div class="lc-words">' + w.words.slice(0, 3).join(' · ') + '</div>') +
     '</button>';
   }).join('');
 
@@ -11457,7 +11467,8 @@ function openDetail(char){
   if(!item) return;
   S.detailChar = char;
 
-  $('dChar').textContent = item.char;
+  $('dChar').textContent = '';
+  $('dPractice').textContent = item.char.length > 1 ? '整词练习' : '单字练习';
   $('dPy').textContent = item.pinyin || pyOf(item.char, item.words);
   $('dDots').innerHTML = dotsHTML(item.count);
 
@@ -11488,7 +11499,7 @@ function openDetail(char){
 
   const box = $('dAnim');
   box.innerHTML = '';
-  setTimeout(function(){ mountStroke(box, item.char, { animate:true, speed:1 }); }, 120);
+  // 详情只显示拼音，不在练习前透露字形。
 }
 
 function closeDetail(){
