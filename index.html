@@ -1937,6 +1937,12 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 .word-cell canvas{width:100%;height:auto;aspect-ratio:1;box-sizing:border-box;background:linear-gradient(90deg,transparent calc(50% - .5px),#d9d0bd calc(50% - .5px),#d9d0bd calc(50% + .5px),transparent calc(50% + .5px)),linear-gradient(transparent calc(50% - .5px),#d9d0bd calc(50% - .5px),#d9d0bd calc(50% + .5px),transparent calc(50% + .5px)),var(--paper);}
 .word-cell[hidden]{display:none;}
 
+
+#wordAnswerDisplay{display:grid;grid-template-columns:repeat(var(--answer-count,2),minmax(0,1fr));gap:10px;width:100%;max-width:calc(var(--answer-count,2) * 130px);align-self:center;}
+#wordAnswerDisplay[hidden]{display:none;}
+.word-answer-char{display:grid;place-items:center;aspect-ratio:1;min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--paper);font-family:var(--font-cn);font-size:clamp(30px,5vw,64px);line-height:1.2;color:var(--ink);}
+.word-mode .stroke-col,.word-mode .answer-grid>.info-col,.word-mode #ansChar{display:none;}
+.word-mode .answer-top{flex-wrap:wrap;}
 </style>
 </head>
 
@@ -2142,6 +2148,7 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
                     <span class="dots md" id="ansDots"></span>
                   </div>
 
+                  <div id="wordAnswerDisplay" aria-label="整词参考答案" hidden></div>
                   <div class="answer-grid">
                     <div class="stroke-col">
                       <div class="tian tian-sm" id="strokeTian">
@@ -8927,16 +8934,15 @@ function cssVar(name, fallback){
  */
 const strokeMounts = new WeakMap();
 
+function renderWholeWordAnswer(box,word){
+  box.replaceChildren();
+  box.style.setProperty('--answer-count',Array.from(word).length);
+  Array.from(word).forEach(function(ch){
+    const cell=document.createElement('span');cell.className='word-answer-char';cell.textContent=ch;box.appendChild(cell);
+  });
+}
 function mountStroke(box, char, opts){
-  if(char && char.length > 1){
-    box.innerHTML = '';
-    const select = document.createElement('select');
-    select.setAttribute('aria-label','选择词语中的字查看笔顺');
-    Array.from(char).forEach(function(ch,i){ const op=document.createElement('option');op.value=ch;op.textContent=(i+1)+' · '+ch;select.appendChild(op); });
-    const inner = document.createElement('div');inner.style.cssText='width:100%;height:calc(100% - 34px);min-height:70px';
-    box.append(select,inner);select.onchange=function(){mountStroke(inner,select.value,opts);};
-    mountStroke(inner,char[0],opts);return;
-  }
+  if(char && char.length > 1){ renderWholeWordAnswer(box,char); return; }
   opts = opts || {};
   box.innerHTML = '';
   if(!char) return;
@@ -9646,6 +9652,9 @@ function renderCard(){
 
   // 答案面
   $('ansChar').textContent = item.char;
+  $('wordAnswerDisplay').hidden=item.char.length<2;
+  if(item.char.length>1) renderWholeWordAnswer($('wordAnswerDisplay'),item.char);
+  else $('wordAnswerDisplay').replaceChildren();
   $('ansPy').textContent = item.pinyin || pyOf(item.char, item.words);
   $('ansDots').innerHTML = dotsHTML(item.count);
 
@@ -9770,7 +9779,7 @@ function reveal(opts){
   updateFoot();
 
   const item = currentItem();
-  if(item){
+  if(item && item.char.length === 1){
     const box = $('strokeAnim');
     setTimeout(function(){
       mountStroke(box, item.char, { animate:true, speed:1 });
