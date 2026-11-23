@@ -1930,7 +1930,9 @@ textarea::-webkit-input-placeholder{opacity:var(--ph-op,.6);}
 .word-cell[hidden]{display:none;}
 .word-cell canvas{width:100%;height:auto;aspect-ratio:1;}
 @media(min-width:601px){.word-cells{grid-template-columns:repeat(min(var(--word-count,4),4),minmax(0,1fr));}}
-#modalDetail #dChar,#modalDetail .detail-head+div,#modalDetail .info-label,#modalDetail #dWords,#modalDetail #dSentence{display:none!important;}
+#modalDetail #dChar,#modalDetail .detail-head+div{display:none!important;}
+#modalDetail.is-word-detail #dWords,#modalDetail.is-word-detail .info-label:has(+ #dWords){display:none;}
+#view-review .answer-grid>.info-col,#view-review .answer-grid>.sent-col{display:none;}
 #modalDetail .dh-py{font-size:clamp(24px,4vw,36px);overflow-wrap:anywhere;}
 .word-mode #ansWords,.word-mode .info-label:has(+ #ansWords){display:none;}
 
@@ -9639,15 +9641,9 @@ function renderCard(){
 
   // 书写面
   $('frontPinyin').textContent = item.pinyin || pyOf(item.char, item.words);
-  let hints = item.words.slice(0, 3).map(function(w){
-    const py = pyOf(w);
-    const masked = w.split(item.char).join('<span class="blank">□</span>');
-    return '<span class="hint-chip">' + masked + ' <small>' + (py || '') + '</small></span>';
-  });
-  if(item.char.length > 1){ hints = ['<span class="hint-chip">整词默写 · ' + item.char.length + ' 个字</span>']; }
-  if(!hints.length){
-    hints = ['<span class="hint-chip">暂无组词 · 凭拼音直接默写</span>'];
-  }
+  const hints = [item.char.length > 1
+    ? '<span class="hint-chip">整词默写 · ' + item.char.length + ' 个字</span>'
+    : '<span class="hint-chip">凭拼音默写</span>'];
   $('frontHints').innerHTML = hints.join('');
 
   // 答案面
@@ -9658,13 +9654,8 @@ function renderCard(){
   $('ansPy').textContent = item.pinyin || pyOf(item.char, item.words);
   $('ansDots').innerHTML = dotsHTML(item.count);
 
-  $('ansWords').innerHTML = item.words.length ? item.words.map(function(w){
-    const py = pyOf(w);
-    const html = w.split(item.char).join('<em>' + item.char + '</em>');
-    return '<div class="word-pill"><small>' + (py || '&nbsp;') + '</small><span>' + html + '</span></div>';
-  }).join('') : '<div class="word-empty">组词待补充 · 可在字库里编辑</div>';
-
-  renderSentences($('ansSentence'), item);
+  $('ansWords').replaceChildren();
+  $('ansSentence').replaceChildren();
 
   $('strokeAnim').innerHTML = '';
   $('strokeTian').classList.remove('loading');
@@ -11479,6 +11470,7 @@ function openDetail(char){
   const item = S.words.filter(function(w){ return w.char === char; })[0];
   if(!item) return;
   S.detailChar = char;
+  $('modalDetail').classList.toggle('is-word-detail',item.char.length > 1);
 
   $('dChar').textContent = '';
   $('dPractice').textContent = item.char.length > 1 ? '整词练习' : '单字练习';
@@ -11512,7 +11504,7 @@ function openDetail(char){
 
   const box = $('dAnim');
   box.innerHTML = '';
-  // 详情只显示拼音，不在练习前透露字形。
+  // 字库详情显示组词和例句；练习页仅显示拼音及参考答案。
 }
 
 function closeDetail(){
